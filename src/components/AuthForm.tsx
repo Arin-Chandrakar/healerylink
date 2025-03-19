@@ -38,11 +38,12 @@ const AuthForm = ({ mode }: AuthFormProps) => {
   // Determine which schema to use based on mode
   const schema = mode === 'signin' ? signInSchema : signUpSchema;
   
+  // Use proper default values for the form
   const form = useForm<SignInValues | SignUpValues>({
     resolver: zodResolver(schema),
     defaultValues: mode === 'signin' 
       ? { email: '', password: '' } 
-      : { name: '', email: '', password: '', role: undefined as unknown as UserRole },
+      : { name: '', email: '', password: '', role: 'patient' }, // Set a default role
   });
 
   const onSubmit = async (values: SignInValues | SignUpValues) => {
@@ -133,17 +134,17 @@ const AuthForm = ({ mode }: AuthFormProps) => {
                   <FormControl>
                     <RadioGroup
                       onValueChange={field.onChange}
-                      defaultValue={field.value}
+                      value={field.value}
                       className="flex gap-4"
                     >
                       <div className="flex-1">
                         <FormItem className="glass hover:shadow-md transition-all duration-300 rounded-lg p-4 [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:ring-1 [&:has([data-state=checked])]:ring-primary">
                           <FormControl>
-                            <RadioGroupItem value="doctor" className="sr-only" />
+                            <RadioGroupItem value="doctor" className="sr-only" id="role-doctor" />
                           </FormControl>
-                          <div className="flex flex-col items-center justify-center gap-2 p-2">
+                          <div className="flex flex-col items-center justify-center gap-2 p-2 cursor-pointer" onClick={() => field.onChange("doctor")}>
                             <Stethoscope className="h-8 w-8 text-primary" />
-                            <FormLabel className="font-normal cursor-pointer">Doctor</FormLabel>
+                            <FormLabel className="font-normal cursor-pointer" htmlFor="role-doctor">Doctor</FormLabel>
                           </div>
                         </FormItem>
                       </div>
@@ -151,11 +152,11 @@ const AuthForm = ({ mode }: AuthFormProps) => {
                       <div className="flex-1">
                         <FormItem className="glass hover:shadow-md transition-all duration-300 rounded-lg p-4 [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:ring-1 [&:has([data-state=checked])]:ring-primary">
                           <FormControl>
-                            <RadioGroupItem value="patient" className="sr-only" />
+                            <RadioGroupItem value="patient" className="sr-only" id="role-patient" />
                           </FormControl>
-                          <div className="flex flex-col items-center justify-center gap-2 p-2">
+                          <div className="flex flex-col items-center justify-center gap-2 p-2 cursor-pointer" onClick={() => field.onChange("patient")}>
                             <User className="h-8 w-8 text-primary" />
-                            <FormLabel className="font-normal cursor-pointer">Patient</FormLabel>
+                            <FormLabel className="font-normal cursor-pointer" htmlFor="role-patient">Patient</FormLabel>
                           </div>
                         </FormItem>
                       </div>
