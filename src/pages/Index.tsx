@@ -71,7 +71,7 @@ const Index = () => {
               viewport={{ once: true }}
               className="text-3xl md:text-4xl font-bold mb-4"
             >
-              Why Choose MediConnect?
+              Why Choose HEATHER?
             </motion.h2>
             <motion.p 
               initial={{ opacity: 0, y: 20 }}
@@ -233,7 +233,7 @@ const Index = () => {
             viewport={{ once: true }}
             className="text-lg text-gray-600 max-w-2xl mx-auto mb-8"
           >
-            Join thousands of patients and doctors who are already using MediConnect to streamline healthcare.
+            Join thousands of patients and doctors who are already using HEATHER to streamline healthcare.
           </motion.p>
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -261,7 +261,7 @@ const Index = () => {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-4 md:mb-0">
-              <span className="text-xl font-semibold text-primary">MediConnect</span>
+              <span className="text-xl font-semibold text-primary">HEATHER</span>
               <p className="text-sm text-gray-500 mt-1">
                 Connecting doctors and patients seamlessly.
               </p>
@@ -276,7 +276,7 @@ const Index = () => {
           </div>
           
           <div className="text-center mt-8 text-sm text-gray-500">
-            &copy; {new Date().getFullYear()} MediConnect. All rights reserved.
+            &copy; {new Date().getFullYear()} HEATHER. All rights reserved.
           </div>
         </div>
       </footer>

@@ -38,7 +38,7 @@ const Navbar = () => {
               to="/" 
               className="text-2xl font-semibold text-primary transition-colors duration-300"
             >
-              MediConnect
+              HEATHER
             </Link>
           </div>
 

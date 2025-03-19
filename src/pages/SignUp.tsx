@@ -24,7 +24,7 @@ const SignUp = () => {
             className="lg:w-1/2 bg-primary p-10 text-white flex flex-col justify-center"
           >
             <div className="max-w-md mx-auto">
-              <h1 className="text-3xl font-bold mb-4">Join MediConnect</h1>
+              <h1 className="text-3xl font-bold mb-4">Join HEATHER</h1>
               <p className="text-blue-100 mb-6">
                 Create an account to connect with healthcare professionals or find patients who need your expertise.
               </p>

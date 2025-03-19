@@ -33,13 +33,13 @@ const SignIn = () => {
               <div className="max-w-md">
                 <h1 className="text-3xl font-bold mb-4 text-white">Welcome Back</h1>
                 <p className="text-blue-100 mb-6">
-                  Sign in to access your MediConnect account and continue connecting with healthcare professionals or patients.
+                  Sign in to access your HEATHER account and continue connecting with healthcare professionals or patients.
                 </p>
                 
                 <div className="space-y-6 mb-8">
                   <div className="p-4 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20">
                     <p className="text-white italic">
-                      "MediConnect has transformed how I connect with patients. The platform is intuitive and has helped me grow my practice significantly."
+                      "HEATHER has transformed how I connect with patients. The platform is intuitive and has helped me grow my practice significantly."
                     </p>
                     <div className="mt-3 flex items-center">
                       <div className="h-8 w-8 rounded-full bg-blue-400 flex items-center justify-center text-white font-bold">D</div>
