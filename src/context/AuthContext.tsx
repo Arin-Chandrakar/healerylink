@@ -2,6 +2,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
+import { toast } from '@/components/ui/use-toast';
 
 export type UserRole = 'doctor' | 'patient' | null;
 
@@ -25,10 +26,43 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Initialize Supabase client
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Initialize Supabase client safely
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+// Create a simple mock client if environment variables are not available
+let supabase: any;
+
+if (supabaseUrl && supabaseKey) {
+  supabase = createClient(supabaseUrl, supabaseKey);
+} else {
+  console.error('Supabase credentials are missing. Check your environment variables.');
+  // Create a mock client that logs operations but doesn't perform actual actions
+  supabase = {
+    auth: {
+      getSession: async () => ({ data: { session: null }, error: new Error('Supabase not configured') }),
+      signInWithPassword: async () => ({ error: new Error('Supabase not configured') }),
+      signUp: async () => ({ error: new Error('Supabase not configured') }),
+      signOut: async () => ({ error: null }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+    },
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: async () => ({ data: null, error: new Error('Supabase not configured') }),
+        }),
+      }),
+      update: () => ({
+        eq: () => ({
+          select: () => ({
+            single: async () => ({ data: null, error: new Error('Supabase not configured') }),
+          }),
+        }),
+      }),
+      upsert: async () => ({ error: new Error('Supabase not configured') }),
+    }),
+  };
+}
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -36,10 +70,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Display a toast notification if Supabase is not configured
+    if (!supabaseUrl || !supabaseKey) {
+      toast({
+        title: "Configuration Error",
+        description: "Supabase is not properly configured. Please check your environment variables.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+      return;
+    }
+
     const getSession = async () => {
       setIsLoading(true);
       const { data, error } = await supabase.auth.getSession();
       if (error) {
+        console.error('Session error:', error);
         setIsLoading(false);
         return;
       }
@@ -61,6 +107,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             role: profiles.role,
             profileCompleted: profiles.profile_completed,
           });
+        } else if (profileError) {
+          console.error('Profile fetch error:', profileError);
         }
       }
       setIsLoading(false);
