@@ -1,6 +1,5 @@
-
 import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import Navbar from '@/components/Navbar';
 import ProfileCard from '@/components/ProfileCard';
@@ -9,8 +8,8 @@ import { CalendarClock, Clock, MessageSquare, Search, User } from 'lucide-react'
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from 'sonner';
 
-// Mock data for doctors and appointments
 const mockDoctors = [
   {
     id: '1',
@@ -109,6 +108,7 @@ const mockAppointments = [
 const Dashboard = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -129,7 +129,6 @@ const Dashboard = () => {
     return <Navigate to="/sign-in" />;
   }
 
-  // Filter data based on search query
   const filteredDoctors = mockDoctors.filter(doctor => 
     doctor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     doctor.specialty.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -140,6 +139,24 @@ const Dashboard = () => {
     patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     patient.location.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleDoctorClick = (doctorId: string) => {
+    navigate(`/doctor-profile?id=${doctorId}`);
+    toast.success("Viewing doctor's profile");
+  };
+
+  const handlePatientClick = (patientId: string) => {
+    navigate(`/patient-profile?id=${patientId}`);
+    toast.success("Viewing patient's profile");
+  };
+
+  const handleBookAppointment = (doctorId: string) => {
+    toast.info("Booking functionality will be available soon!");
+  };
+
+  const handleViewAppointmentDetails = (appointmentId: string) => {
+    toast.info("Appointment details will be available soon!");
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
@@ -185,7 +202,6 @@ const Dashboard = () => {
           </TabsList>
           
           <TabsContent value="overview" className="space-y-8 animate-fade-in">
-            {/* Quick stats */}
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -230,7 +246,6 @@ const Dashboard = () => {
               </div>
             </motion.div>
             
-            {/* Doctors or Patients List */}
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -255,6 +270,7 @@ const Dashboard = () => {
                         location={patient.location}
                         imageUrl={patient.imageUrl}
                         isDoctor={false}
+                        onClick={() => handlePatientClick(patient.id)}
                       />
                     ))
                   ) : (
@@ -273,6 +289,7 @@ const Dashboard = () => {
                         rating={doctor.rating}
                         verified={doctor.verified}
                         imageUrl={doctor.imageUrl}
+                        onClick={() => handleDoctorClick(doctor.id)}
                       />
                     ))
                   ) : (
@@ -319,7 +336,12 @@ const Dashboard = () => {
                           </div>
                         </div>
                         
-                        <Button variant="outline" size="sm" className="bg-white text-primary hover:bg-primary hover:text-white">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="bg-white text-primary hover:bg-primary hover:text-white"
+                          onClick={() => handleViewAppointmentDetails(appointment.id)}
+                        >
                           Details
                         </Button>
                       </div>
@@ -331,7 +353,12 @@ const Dashboard = () => {
                   <CalendarClock className="h-12 w-12 mx-auto text-gray-400 mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-1">No upcoming appointments</h3>
                   <p className="text-gray-500 mb-4">You have no appointments scheduled.</p>
-                  <Button className="btn-primary">Schedule an Appointment</Button>
+                  <Button 
+                    className="btn-primary"
+                    onClick={() => toast.info("Scheduling functionality will be available soon!")}
+                  >
+                    Schedule an Appointment
+                  </Button>
                 </div>
               )}
             </div>
@@ -349,7 +376,10 @@ const Dashboard = () => {
                     ? 'Start the conversation with your patients.' 
                     : 'Connect with a doctor to start messaging.'}
                 </p>
-                <Button className="btn-primary">
+                <Button 
+                  className="btn-primary"
+                  onClick={() => toast.info("Messaging functionality will be available soon!")}
+                >
                   {user?.role === 'doctor' ? 'Message a Patient' : 'Find a Doctor'}
                 </Button>
               </div>
