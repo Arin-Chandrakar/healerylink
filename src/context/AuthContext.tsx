@@ -3,6 +3,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { Database } from '@/integrations/supabase/types';
 
 export type UserRole = 'doctor' | 'patient' | null;
 
@@ -55,8 +56,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             id: profiles.id,
             name: profiles.name,
             email: profiles.email,
-            role: profiles.role,
-            profileCompleted: profiles.profile_completed,
+            role: profiles.role as UserRole,
+            profileCompleted: profiles.profile_completed || false,
           });
         } else if (profileError) {
           console.error('Profile fetch error:', profileError);
@@ -81,8 +82,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             id: profiles.id,
             name: profiles.name,
             email: profiles.email,
-            role: profiles.role,
-            profileCompleted: profiles.profile_completed,
+            role: profiles.role as UserRole,
+            profileCompleted: profiles.profile_completed || false,
           });
         }
       }
@@ -126,8 +127,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       id: profile.id,
       name: profile.name,
       email: profile.email,
-      role: profile.role,
-      profileCompleted: profile.profile_completed,
+      role: profile.role as UserRole,
+      profileCompleted: profile.profile_completed || false,
     };
 
     localStorage.setItem('user', JSON.stringify(mappedUser));
@@ -198,11 +199,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updateUserProfile = async (userData: Partial<User>) => {
     if (!user) return;
 
-    // Always mark profile_completed as true when updating
-    const newUser = { ...userData, profile_completed: true };
+    // Map from camelCase to snake_case for DB
+    const dbData: any = {};
+    if (userData.name) dbData.name = userData.name;
+    if (userData.email) dbData.email = userData.email;
+    if (userData.role) dbData.role = userData.role;
+    if (userData.profileCompleted !== undefined) dbData.profile_completed = userData.profileCompleted;
+    else dbData.profile_completed = true; // Always mark completed when updating
+
     const { data: updated, error } = await supabase
       .from('profiles')
-      .update(newUser)
+      .update(dbData)
       .eq('id', user.id)
       .select()
       .single();
@@ -215,8 +222,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       id: updated.id,
       name: updated.name,
       email: updated.email,
-      role: updated.role,
-      profileCompleted: updated.profile_completed,
+      role: updated.role as UserRole,
+      profileCompleted: updated.profile_completed || false,
     };
 
     localStorage.setItem('user', JSON.stringify(profile));
