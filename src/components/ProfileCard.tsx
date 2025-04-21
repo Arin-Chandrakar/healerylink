@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, MapPin, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 interface ProfileCardProps {
   name: string;
@@ -15,6 +16,7 @@ interface ProfileCardProps {
   isDoctor?: boolean;
   className?: string;
   onClick?: () => void;
+  onBook?: () => void; // New prop for booking appointments
 }
 
 const ProfileCard = ({
@@ -27,14 +29,28 @@ const ProfileCard = ({
   isDoctor = true,
   className,
   onClick,
+  onBook,
 }: ProfileCardProps) => {
+  const handleClick = (e: React.MouseEvent) => {
+    if (onClick) {
+      onClick();
+    }
+  };
+
+  const handleBookClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent the card's onClick from firing
+    if (onBook) {
+      onBook();
+    }
+  };
+
   return (
     <Card 
       className={cn(
         "overflow-hidden transition-all duration-300 hover:shadow-md cursor-pointer",
         className
       )}
-      onClick={onClick}
+      onClick={handleClick}
     >
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between">
@@ -81,6 +97,19 @@ const ProfileCard = ({
             <Badge variant="outline" className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200">
               Available Today
             </Badge>
+            
+            {/* Add Book button */}
+            {onBook && (
+              <div className="w-full mt-3">
+                <Button 
+                  size="sm" 
+                  className="w-full bg-primary hover:bg-primary/90 text-white"
+                  onClick={handleBookClick}
+                >
+                  Book Appointment
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </CardContent>

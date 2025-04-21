@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -108,6 +109,7 @@ const mockAppointments = [
 const Dashboard = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('overview');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -151,11 +153,36 @@ const Dashboard = () => {
   };
 
   const handleBookAppointment = (doctorId: string) => {
-    toast.info("Booking functionality will be available soon!");
+    navigate(`/book-appointment?doctorId=${doctorId}`);
+    toast.success("Booking an appointment with the doctor");
   };
 
   const handleViewAppointmentDetails = (appointmentId: string) => {
     toast.info("Appointment details will be available soon!");
+  };
+
+  const handleFindDoctor = () => {
+    // Change to the overview tab if not already active
+    setActiveTab('overview');
+    
+    // If the user is a doctor, we'll inform them they cannot book with other doctors
+    if (user?.role === 'doctor') {
+      toast.info("As a doctor, you don't need to find other doctors.");
+      return;
+    }
+    
+    // For patients, focus the search bar
+    if (document.querySelector('input[type="text"]')) {
+      (document.querySelector('input[type="text"]') as HTMLInputElement).focus();
+    }
+    
+    toast.success("Find your perfect doctor match below!");
+    
+    // Scroll to the doctors section
+    const doctorsSection = document.getElementById("doctorsSection");
+    if (doctorsSection) {
+      doctorsSection.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   return (
@@ -194,7 +221,11 @@ const Dashboard = () => {
           </div>
         </motion.div>
         
-        <Tabs defaultValue="overview" className="space-y-8">
+        <Tabs 
+          value={activeTab} 
+          onValueChange={setActiveTab} 
+          className="space-y-8"
+        >
           <TabsList className="grid w-full max-w-md mx-auto grid-cols-3 h-14 glass">
             <TabsTrigger value="overview" className="data-[state=active]:glass-dark">Overview</TabsTrigger>
             <TabsTrigger value="appointments" className="data-[state=active]:glass-dark">Appointments</TabsTrigger>
@@ -250,6 +281,7 @@ const Dashboard = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
+              id="doctorsSection"
             >
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold">
@@ -289,7 +321,9 @@ const Dashboard = () => {
                         rating={doctor.rating}
                         verified={doctor.verified}
                         imageUrl={doctor.imageUrl}
+                        isDoctor={true}
                         onClick={() => handleDoctorClick(doctor.id)}
+                        onBook={() => handleBookAppointment(doctor.id)}
                       />
                     ))
                   ) : (
@@ -378,7 +412,7 @@ const Dashboard = () => {
                 </p>
                 <Button 
                   className="btn-primary"
-                  onClick={() => toast.info("Messaging functionality will be available soon!")}
+                  onClick={handleFindDoctor}
                 >
                   {user?.role === 'doctor' ? 'Message a Patient' : 'Find a Doctor'}
                 </Button>
