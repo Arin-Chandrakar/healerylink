@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -10,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
+import GeminiChatbox from "@/components/GeminiChatbox";
 
 const mockDoctors = [
   {
@@ -144,7 +144,6 @@ const Dashboard = () => {
     patient.location.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Show all doctors or just a portion
   const displayedDoctors = showAllDoctors ? filteredDoctors : filteredDoctors.slice(0, 4);
 
   const handleDoctorClick = (doctorId: string) => {
@@ -157,19 +156,15 @@ const Dashboard = () => {
     toast.success("Viewing patient's profile");
   };
 
-  // Modified: Add appointment to state
   const handleBookAppointment = (doctorId: string) => {
-    // Find doctor info
     const doctor = mockDoctors.find(d => d.id === doctorId);
     if (!doctor || !user) return;
 
-    // Create fake patient for demonstration
     const patient =
       user.role === 'doctor'
-        ? mockPatients[0] // pick default if doctor books
+        ? mockPatients[0]
         : { name: user.name, imageUrl: user.imageUrl || '', id: user.id || '', location: user.location || '' };
 
-    // Fake date/time/reason for demo; in real app, you would input this
     const today = new Date();
     const formattedDate = today.toISOString().substring(0, 10);
     const formattedTime = today.getHours() > 12 ? `${today.getHours() - 12}:00 PM` : `${today.getHours()}:00 AM`;
@@ -211,23 +206,19 @@ const Dashboard = () => {
   };
 
   const handleFindDoctor = () => {
-    // Change to the overview tab if not already active
     setActiveTab('overview');
     
-    // If the user is a doctor, we'll inform them they cannot book with other doctors
     if (user?.role === 'doctor') {
       toast.info("As a doctor, you don't need to find other doctors.");
       return;
     }
     
-    // For patients, focus the search bar
     if (document.querySelector('input[type="text"]')) {
       (document.querySelector('input[type="text"]') as HTMLInputElement).focus();
     }
     
     toast.success("Find your perfect doctor match below!");
     
-    // Scroll to the doctors section
     const doctorsSection = document.getElementById("doctorsSection");
     if (doctorsSection) {
       doctorsSection.scrollIntoView({ behavior: 'smooth' });
@@ -474,6 +465,7 @@ const Dashboard = () => {
           </TabsContent>
         </Tabs>
       </div>
+      <GeminiChatbox />
     </div>
   );
 };
