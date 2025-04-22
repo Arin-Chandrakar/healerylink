@@ -110,6 +110,7 @@ const Dashboard = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
+  const [showAllDoctors, setShowAllDoctors] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -142,6 +143,9 @@ const Dashboard = () => {
     patient.location.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Show all doctors or just a portion
+  const displayedDoctors = showAllDoctors ? filteredDoctors : filteredDoctors.slice(0, 4);
+
   const handleDoctorClick = (doctorId: string) => {
     navigate(`/doctor-profile?id=${doctorId}`);
     toast.success("Viewing doctor's profile");
@@ -159,6 +163,16 @@ const Dashboard = () => {
 
   const handleViewAppointmentDetails = (appointmentId: string) => {
     toast.info("Appointment details will be available soon!");
+  };
+
+  const handleViewAllDoctors = () => {
+    setShowAllDoctors(true);
+    setTimeout(() => {
+      const doctorsSection = document.getElementById("doctorsSection");
+      if (doctorsSection) {
+        doctorsSection.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 100);
   };
 
   const handleFindDoctor = () => {
@@ -287,7 +301,11 @@ const Dashboard = () => {
                 <h2 className="text-xl font-semibold">
                   {user?.role === 'doctor' ? 'Your Patients' : 'Recommended Doctors'}
                 </h2>
-                <Button variant="outline" className="text-primary border-primary">
+                <Button 
+                  variant="outline" 
+                  className="text-primary border-primary"
+                  onClick={user?.role === 'doctor' ? undefined : handleViewAllDoctors}
+                >
                   View All
                 </Button>
               </div>
@@ -311,8 +329,8 @@ const Dashboard = () => {
                     </div>
                   )
                 ) : (
-                  filteredDoctors.length > 0 ? (
-                    filteredDoctors.map((doctor) => (
+                  displayedDoctors.length > 0 ? (
+                    displayedDoctors.map((doctor) => (
                       <ProfileCard
                         key={doctor.id}
                         name={doctor.name}
