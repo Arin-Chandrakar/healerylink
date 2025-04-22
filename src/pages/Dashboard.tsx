@@ -163,7 +163,7 @@ const Dashboard = () => {
     const patient =
       user.role === 'doctor'
         ? mockPatients[0]
-        : { name: user.name, imageUrl: user.imageUrl || '', id: user.id || '', location: user.location || '' };
+        : { name: user.name, imageUrl: user.imageUrl ?? '', id: user.id ?? '', location: user.location ?? '' };
 
     const today = new Date();
     const formattedDate = today.toISOString().substring(0, 10);
