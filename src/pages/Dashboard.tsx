@@ -81,7 +81,7 @@ const mockPatients = [
   },
 ];
 
-const mockAppointments = [
+const initialAppointments = [
   {
     id: '1',
     doctorName: 'Dr. Sarah Johnson',
@@ -111,6 +111,7 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
   const [showAllDoctors, setShowAllDoctors] = useState(false);
+  const [appointments, setAppointments] = useState(initialAppointments);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -156,9 +157,43 @@ const Dashboard = () => {
     toast.success("Viewing patient's profile");
   };
 
+  // Modified: Add appointment to state
   const handleBookAppointment = (doctorId: string) => {
-    navigate(`/book-appointment?doctorId=${doctorId}`);
-    toast.success("Booking an appointment with the doctor");
+    // Find doctor info
+    const doctor = mockDoctors.find(d => d.id === doctorId);
+    if (!doctor || !user) return;
+
+    // Create fake patient for demonstration
+    const patient =
+      user.role === 'doctor'
+        ? mockPatients[0] // pick default if doctor books
+        : { name: user.name, imageUrl: user.imageUrl || '', id: user.id || '', location: user.location || '' };
+
+    // Fake date/time/reason for demo; in real app, you would input this
+    const today = new Date();
+    const formattedDate = today.toISOString().substring(0, 10);
+    const formattedTime = today.getHours() > 12 ? `${today.getHours() - 12}:00 PM` : `${today.getHours()}:00 AM`;
+
+    const newAppointment = {
+      id: (appointments.length + 1).toString(),
+      doctorName: doctor.name,
+      patientName: patient.name,
+      date: formattedDate,
+      time: formattedTime,
+      status: 'upcoming',
+      reason: 'General Consultation',
+      doctorImage: doctor.imageUrl,
+      patientImage: patient.imageUrl,
+    };
+    setAppointments(prev => [newAppointment, ...prev]);
+    toast.success("Appointment booked!");
+    setActiveTab('appointments');
+    setTimeout(() => {
+      const apptSection = document.querySelector('[data-tab-content="appointments"]');
+      if (apptSection) {
+        apptSection.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 400);
   };
 
   const handleViewAppointmentDetails = (appointmentId: string) => {
@@ -259,7 +294,7 @@ const Dashboard = () => {
                 </div>
                 <div className="ml-4">
                   <p className="text-gray-500 text-sm">Upcoming</p>
-                  <h3 className="text-2xl font-bold">{mockAppointments.length}</h3>
+                  <h3 className="text-2xl font-bold">{appointments.length}</h3>
                   <p className="text-gray-500 text-sm">Appointments</p>
                 </div>
               </div>
@@ -354,13 +389,13 @@ const Dashboard = () => {
             </motion.div>
           </TabsContent>
           
-          <TabsContent value="appointments" className="animate-fade-in">
+          <TabsContent value="appointments" className="animate-fade-in" data-tab-content="appointments">
             <div className="glass rounded-xl p-6">
               <h2 className="text-xl font-semibold mb-6">Upcoming Appointments</h2>
               
-              {mockAppointments.length > 0 ? (
+              {appointments.length > 0 ? (
                 <div className="space-y-4">
-                  {mockAppointments.map((appointment) => (
+                  {appointments.map((appointment) => (
                     <div key={appointment.id} className="glass-dark p-4 rounded-xl flex items-center justify-between">
                       <div className="flex items-center">
                         <img 
