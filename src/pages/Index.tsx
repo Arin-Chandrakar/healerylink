@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -10,12 +9,15 @@ import {
   HeartPulse, 
   BookOpen 
 } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 import Navbar from '@/components/Navbar';
 import HeroSection from '@/components/HeroSection';
 import FeatureCard from '@/components/FeatureCard';
 import { Button } from '@/components/ui/button';
 
 const Index = () => {
+  const { isAuthenticated } = useAuth();
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -242,16 +244,27 @@ const Index = () => {
             viewport={{ once: true }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <Link to="/sign-up">
-              <Button className="btn-primary w-full sm:w-auto">
-                Create an Account
-              </Button>
-            </Link>
-            <Link to="/sign-in">
-              <Button className="btn-outline w-full sm:w-auto">
-                Sign In
-              </Button>
-            </Link>
+            {!isAuthenticated && (
+              <>
+                <Link to="/sign-up">
+                  <Button className="btn-primary w-full sm:w-auto">
+                    Create an Account
+                  </Button>
+                </Link>
+                <Link to="/sign-in">
+                  <Button className="btn-outline w-full sm:w-auto">
+                    Sign In
+                  </Button>
+                </Link>
+              </>
+            )}
+            {isAuthenticated && (
+              <Link to="/dashboard">
+                <Button className="btn-primary w-full sm:w-auto">
+                  Go to Dashboard
+                </Button>
+              </Link>
+            )}
           </motion.div>
         </div>
       </section>
