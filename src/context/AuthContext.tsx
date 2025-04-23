@@ -1,15 +1,16 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 export type UserRole = 'doctor' | 'patient' | null;
 
 export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  profileCompleted: boolean;
+  id?: string;
+  name?: string;
+  email?: string;
+  role?: UserRole;
+  profileCompleted?: boolean;
+  imageUrl?: string;
+  location?: string;
 }
 
 interface AuthContextType {
