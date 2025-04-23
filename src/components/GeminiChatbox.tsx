@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from "react";
 import { MessageSquare, Send } from "lucide-react";
 import { Button } from "./ui/button";
@@ -9,7 +10,8 @@ interface Message {
   content: string;
 }
 
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent";
+// Updated Gemini API URL
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent";
 
 export default function GeminiChatbox() {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem("GEMINI_API_KEY") || "");
@@ -44,21 +46,21 @@ export default function GeminiChatbox() {
   const sendWithGemini = async (userPrompt: string) => {
     setLoading(true);
     try {
+      // Updated request structure for the gemini-1.5-flash-latest model
       const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [
             {
-              role: "user",
               parts: [{ text: userPrompt }]
             }
           ],
-          generationConfig: {
+          generation_config: {
             temperature: 0.7,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 1024,
+            top_p: 0.95,
+            top_k: 40,
+            max_output_tokens: 1024,
           }
         }),
       });
@@ -69,6 +71,7 @@ export default function GeminiChatbox() {
       }
 
       const data = await response.json();
+      // Updated path to extract response text from the new API version
       const aiText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn't understand that.";
       setMessages((prev) => [...prev, { role: "ai", content: aiText }]);
       toast.success("Response received");
