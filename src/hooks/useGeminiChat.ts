@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Message } from '@/types/chat';
 import { toast } from 'sonner';
 
