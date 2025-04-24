@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect } from "react";
 import { MessageSquare, Send } from "lucide-react";
 import { Button } from "./ui/button";
@@ -10,7 +9,6 @@ interface Message {
   content: string;
 }
 
-// Updated Gemini API URL
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent";
 
 export default function GeminiChatbox() {
@@ -46,7 +44,6 @@ export default function GeminiChatbox() {
   const sendWithGemini = async (userPrompt: string) => {
     setLoading(true);
     try {
-      // Updated request structure for the gemini-1.5-flash-latest model
       const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -71,10 +68,8 @@ export default function GeminiChatbox() {
       }
 
       const data = await response.json();
-      // Updated path to extract response text from the new API version
       const aiText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn't understand that.";
       setMessages((prev) => [...prev, { role: "ai", content: aiText }]);
-      toast.success("Response received");
     } catch (error) {
       console.error("Gemini API error:", error);
       toast.error(error instanceof Error ? error.message : "Failed to contact Gemini API");
