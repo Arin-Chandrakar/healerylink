@@ -8,19 +8,19 @@ export interface Message {
   conversation_id: string;
   sender_id: string;
   content: string;
-  message_type: 'text' | 'image' | 'file';
+  message_type: string | null;
   read_at: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 export interface Conversation {
   id: string;
   patient_id: string;
   doctor_id: string;
-  status: 'active' | 'closed' | 'archived';
-  created_at: string;
-  updated_at: string;
+  status: string | null;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 export const useMessages = (conversationId?: string) => {
