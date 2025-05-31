@@ -23,7 +23,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (name: string, email: string, password: string, role: UserRole) => Promise<void>;
+  signup: (name: string, email: string, password: string, role: UserRole) => Promise<{ needsConfirmation?: boolean }>;
   logout: () => void;
   updateUserProfile: (userData: Partial<User>) => void;
 }
@@ -47,6 +47,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session?.user?.email);
+      
       if (session?.user) {
         await fetchUserProfile(session.user);
       } else {
@@ -128,9 +130,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw error;
     }
 
-    // The profile will be created automatically by the trigger
-    // and fetched in the auth state change listener
-    navigate('/dashboard');
+    // Check if user needs email confirmation
+    if (data.user && !data.session) {
+      setIsLoading(false);
+      return { needsConfirmation: true };
+    }
+
+    // If session exists (email confirmation disabled), navigate to dashboard
+    if (data.session) {
+      navigate('/dashboard');
+    }
+
+    return {};
   };
 
   const logout = async () => {

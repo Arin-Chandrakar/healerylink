@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { toast } from '@/components/ui/use-toast';
-import { Stethoscope, User } from 'lucide-react';
+import { Stethoscope, User, Mail, CheckCircle } from 'lucide-react';
 import { useAuth, UserRole } from '@/context/AuthContext';
 
 // Define schemas for sign in and sign up
@@ -34,6 +34,7 @@ interface AuthFormProps {
 const AuthForm = ({ mode }: AuthFormProps) => {
   const { login, signup } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   // Determine which schema to use based on mode
   const schema = mode === 'signin' ? signInSchema : signUpSchema;
@@ -59,11 +60,20 @@ const AuthForm = ({ mode }: AuthFormProps) => {
         });
       } else {
         const { name, email, password, role } = values as SignUpValues;
-        await signup(name, email, password, role);
-        toast({
-          title: "Account created!",
-          description: "Your account has been successfully created.",
-        });
+        const result = await signup(name, email, password, role);
+        
+        if (result.needsConfirmation) {
+          setShowConfirmation(true);
+          toast({
+            title: "Check your email!",
+            description: "We've sent you a confirmation link to complete your registration.",
+          });
+        } else {
+          toast({
+            title: "Account created!",
+            description: "Your account has been successfully created.",
+          });
+        }
       }
     } catch (error) {
       toast({
@@ -75,6 +85,31 @@ const AuthForm = ({ mode }: AuthFormProps) => {
       setIsSubmitting(false);
     }
   };
+
+  if (showConfirmation) {
+    return (
+      <div className="w-full max-w-md mx-auto text-center space-y-6">
+        <div className="p-8 rounded-lg bg-green-50 border border-green-200">
+          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-green-800 mb-2">Check Your Email</h3>
+          <p className="text-green-700 mb-4">
+            We've sent you a confirmation link. Please check your email and click the link to activate your account.
+          </p>
+          <div className="flex items-center justify-center text-sm text-green-600">
+            <Mail className="w-4 h-4 mr-2" />
+            <span>Confirmation email sent</span>
+          </div>
+        </div>
+        <Button 
+          variant="outline" 
+          onClick={() => setShowConfirmation(false)}
+          className="w-full"
+        >
+          Back to Sign Up
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-md mx-auto">
