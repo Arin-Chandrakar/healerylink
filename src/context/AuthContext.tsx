@@ -1,16 +1,21 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { User as SupabaseUser } from '@supabase/supabase-js';
 
 export type UserRole = 'doctor' | 'patient' | null;
 
 export interface User {
-  id?: string;
-  name?: string;
-  email?: string;
-  role?: UserRole;
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
   profileCompleted?: boolean;
   imageUrl?: string;
   location?: string;
+  specialty?: string;
+  verified?: boolean;
 }
 
 interface AuthContextType {
@@ -25,113 +30,131 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users data (this would be replaced by an actual backend)
-let mockUsers: User[] = [
-  {
-    id: '1',
-    name: 'Dr. Smith',
-    email: 'dr.smith@example.com',
-    role: 'doctor',
-    profileCompleted: true,
-  },
-  {
-    id: '2',
-    name: 'Jane Doe',
-    email: 'jane@example.com',
-    role: 'patient',
-    profileCompleted: true,
-  }
-];
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check for user in localStorage (simulating persistent auth)
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        fetchUserProfile(session.user);
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        await fetchUserProfile(session.user);
+      } else {
+        setUser(null);
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
+
+  const fetchUserProfile = async (authUser: SupabaseUser) => {
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching profile:', error);
+        setIsLoading(false);
+        return;
+      }
+
+      if (profile) {
+        setUser({
+          id: profile.id,
+          name: profile.name,
+          email: profile.email,
+          role: profile.role as UserRole,
+          profileCompleted: true,
+          imageUrl: profile.image_url,
+          location: profile.location,
+          specialty: profile.specialty,
+          verified: profile.verified,
+        });
+      }
+    } catch (error) {
+      console.error('Error in fetchUserProfile:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
     
-    const foundUser = mockUsers.find(u => u.email === email);
-    if (!foundUser) {
+    if (error) {
       setIsLoading(false);
-      throw new Error('Invalid email or password');
+      throw error;
     }
-    
-    // Save to localStorage for persistence
-    localStorage.setItem('user', JSON.stringify(foundUser));
-    setUser(foundUser);
-    setIsLoading(false);
-    
-    // Redirect based on profile completion
-    if (!foundUser.profileCompleted) {
-      navigate(foundUser.role === 'doctor' ? '/doctor-profile' : '/patient-profile');
-    } else {
-      navigate('/dashboard');
-    }
+
+    // User profile will be fetched in the auth state change listener
+    navigate('/dashboard');
   };
 
   const signup = async (name: string, email: string, password: string, role: UserRole) => {
     setIsLoading(true);
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Check if user already exists
-    if (mockUsers.some(u => u.email === email)) {
-      setIsLoading(false);
-      throw new Error('User with this email already exists');
-    }
-    
-    // Create new user
-    const newUser: User = {
-      id: String(mockUsers.length + 1),
-      name,
+    const { data, error } = await supabase.auth.signUp({
       email,
-      role,
-      profileCompleted: false,
-    };
+      password,
+      options: {
+        data: {
+          name,
+          role,
+        }
+      }
+    });
     
-    // Add to mock database
-    mockUsers.push(newUser);
-    
-    // Save to localStorage for persistence
-    localStorage.setItem('user', JSON.stringify(newUser));
-    setUser(newUser);
-    setIsLoading(false);
-    
-    // Redirect to profile completion
-    navigate(role === 'doctor' ? '/doctor-profile' : '/patient-profile');
+    if (error) {
+      setIsLoading(false);
+      throw error;
+    }
+
+    // The profile will be created automatically by the trigger
+    // and fetched in the auth state change listener
+    navigate('/dashboard');
   };
 
-  const logout = () => {
-    localStorage.removeItem('user');
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
     navigate('/');
   };
 
-  const updateUserProfile = (userData: Partial<User>) => {
+  const updateUserProfile = async (userData: Partial<User>) => {
     if (!user) return;
     
-    const updatedUser = { ...user, ...userData, profileCompleted: true };
-    
-    // Update in mock database
-    mockUsers = mockUsers.map(u => u.id === user.id ? updatedUser : u);
-    
-    // Update in localStorage
-    localStorage.setItem('user', JSON.stringify(updatedUser));
-    setUser(updatedUser);
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        name: userData.name,
+        location: userData.location,
+        specialty: userData.specialty,
+        image_url: userData.imageUrl,
+      })
+      .eq('id', user.id);
+
+    if (!error) {
+      setUser({ ...user, ...userData });
+    }
   };
 
   return (
