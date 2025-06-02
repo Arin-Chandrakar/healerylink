@@ -51,6 +51,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (session?.user) {
         await fetchUserProfile(session.user);
+        // Navigate to dashboard on successful auth
+        if (event === 'SIGNED_IN') {
+          navigate('/dashboard');
+        }
       } else {
         setUser(null);
         setIsLoading(false);
@@ -58,7 +62,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [navigate]);
 
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
@@ -108,40 +112,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     // User profile will be fetched in the auth state change listener
-    navigate('/dashboard');
+    // Navigation will happen in the auth state change listener
   };
 
   const signup = async (name: string, email: string, password: string, role: UserRole) => {
     setIsLoading(true);
     
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name,
-          role,
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+            role,
+          }
         }
+      });
+      
+      if (error) {
+        setIsLoading(false);
+        throw error;
       }
-    });
-    
-    if (error) {
+
+      // Check if user needs email confirmation
+      if (data.user && !data.session) {
+        setIsLoading(false);
+        return { needsConfirmation: true };
+      }
+
+      // If session exists (email confirmation disabled), the auth state change listener will handle navigation
+      return {};
+    } catch (error) {
       setIsLoading(false);
       throw error;
     }
-
-    // Check if user needs email confirmation
-    if (data.user && !data.session) {
-      setIsLoading(false);
-      return { needsConfirmation: true };
-    }
-
-    // If session exists (email confirmation disabled), navigate to dashboard
-    if (data.session) {
-      navigate('/dashboard');
-    }
-
-    return {};
   };
 
   const logout = async () => {
