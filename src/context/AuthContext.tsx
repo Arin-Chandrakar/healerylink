@@ -38,6 +38,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session check:', session?.user?.email);
       if (session?.user) {
         fetchUserProfile(session.user);
       } else {
@@ -51,11 +52,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (session?.user) {
         await fetchUserProfile(session.user);
-        // Navigate to dashboard on successful auth
+        // Navigate to dashboard after successful authentication and profile fetch
         if (event === 'SIGNED_IN') {
+          console.log('Navigating to dashboard after sign in');
           navigate('/dashboard');
         }
       } else {
+        console.log('No session, clearing user state');
         setUser(null);
         setIsLoading(false);
       }
@@ -94,7 +97,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (profile) {
-        setUser({
+        const userData: User = {
           id: profile.id,
           name: profile.name,
           email: profile.email,
@@ -104,7 +107,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           location: profile.location,
           specialty: profile.specialty,
           verified: profile.verified,
-        });
+        };
+        console.log('Setting user from profile:', userData);
+        setUser(userData);
       }
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
@@ -126,20 +131,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const login = async (email: string, password: string) => {
+    console.log('Starting login process for:', email);
     setIsLoading(true);
     
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    
-    if (error) {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      
+      if (error) {
+        console.error('Login error:', error);
+        setIsLoading(false);
+        throw error;
+      }
+
+      console.log('Login successful:', data.user?.email);
+      // User profile will be fetched and navigation will happen in the auth state change listener
+    } catch (error) {
       setIsLoading(false);
       throw error;
     }
-
-    // User profile will be fetched in the auth state change listener
-    // Navigation will happen in the auth state change listener
   };
 
   const signup = async (name: string, email: string, password: string, role: UserRole) => {
@@ -177,6 +189,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
+    console.log('Logging out user');
     await supabase.auth.signOut();
     setUser(null);
     navigate('/');
@@ -206,18 +219,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const contextValue = {
+    user,
+    isAuthenticated: !!user,
+    isLoading,
+    login,
+    signup,
+    logout,
+    updateUserProfile,
+  };
+
+  console.log('Auth context state:', { 
+    isAuthenticated: !!user, 
+    isLoading, 
+    userEmail: user?.email 
+  });
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isAuthenticated: !!user,
-        isLoading,
-        login,
-        signup,
-        logout,
-        updateUserProfile,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
