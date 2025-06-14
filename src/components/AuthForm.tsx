@@ -53,6 +53,7 @@ const AuthForm = ({ mode }: AuthFormProps) => {
     try {
       if (mode === 'signin') {
         const { email, password } = values as SignInValues;
+        console.log('Attempting sign in with:', email);
         await login(email, password);
         toast({
           title: "Welcome back!",
@@ -60,6 +61,7 @@ const AuthForm = ({ mode }: AuthFormProps) => {
         });
       } else {
         const { name, email, password, role } = values as SignUpValues;
+        console.log('Attempting sign up with:', email);
         const result = await signup(name, email, password, role);
         
         if (result.needsConfirmation) {
@@ -76,13 +78,16 @@ const AuthForm = ({ mode }: AuthFormProps) => {
         }
       }
     } catch (error) {
+      console.error('Auth form error:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
       });
     } finally {
+      // Always reset loading state
       setIsSubmitting(false);
+      console.log('Form submission completed, resetting loading state');
     }
   };
 
