@@ -66,6 +66,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
+      console.log('Fetching profile for user:', authUser.id);
+      
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
@@ -74,6 +76,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) {
         console.error('Error fetching profile:', error);
+        
+        // If profiles table doesn't exist or user doesn't have a profile yet,
+        // create a basic user object from auth metadata
+        const fallbackUser: User = {
+          id: authUser.id,
+          name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
+          email: authUser.email || '',
+          role: (authUser.user_metadata?.role as UserRole) || 'patient',
+          profileCompleted: false,
+        };
+        
+        console.log('Using fallback user data:', fallbackUser);
+        setUser(fallbackUser);
         setIsLoading(false);
         return;
       }
@@ -93,6 +108,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
+      
+      // Create fallback user from auth data
+      const fallbackUser: User = {
+        id: authUser.id,
+        name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
+        email: authUser.email || '',
+        role: (authUser.user_metadata?.role as UserRole) || 'patient',
+        profileCompleted: false,
+      };
+      
+      console.log('Using fallback user data after error:', fallbackUser);
+      setUser(fallbackUser);
     } finally {
       setIsLoading(false);
     }
@@ -158,17 +185,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updateUserProfile = async (userData: Partial<User>) => {
     if (!user) return;
     
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        name: userData.name,
-        location: userData.location,
-        specialty: userData.specialty,
-        image_url: userData.imageUrl,
-      })
-      .eq('id', user.id);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          name: userData.name,
+          location: userData.location,
+          specialty: userData.specialty,
+          image_url: userData.imageUrl,
+        })
+        .eq('id', user.id);
 
-    if (!error) {
+      if (!error) {
+        setUser({ ...user, ...userData });
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      // Still update local state even if database update fails
       setUser({ ...user, ...userData });
     }
   };
