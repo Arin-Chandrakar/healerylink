@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { Stethoscope, User, Mail, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAuth, UserRole } from '@/context/AuthContext';
 
@@ -53,11 +53,24 @@ const AuthForm = ({ mode }: AuthFormProps) => {
     setIsSubmitting(true);
     setConnectionError(false);
     
+    // Set a timeout to prevent indefinite loading
+    const timeoutId = setTimeout(() => {
+      console.log('Auth operation timeout');
+      setIsSubmitting(false);
+      toast({
+        title: "Operation Timeout",
+        description: "The authentication process is taking too long. Please try again.",
+        variant: "destructive",
+      });
+    }, 30000); // 30 second timeout
+    
     try {
       if (mode === 'signin') {
         const { email, password } = values as SignInValues;
         console.log('Attempting sign in with:', email);
         await login(email, password);
+        
+        clearTimeout(timeoutId);
         
         toast({
           title: "Welcome back!",
@@ -67,6 +80,8 @@ const AuthForm = ({ mode }: AuthFormProps) => {
         const { name, email, password, role } = values as SignUpValues;
         console.log('Attempting sign up with:', email);
         const result = await signup(name, email, password, role);
+        
+        clearTimeout(timeoutId);
         
         if (result.needsConfirmation) {
           setShowConfirmation(true);
@@ -82,18 +97,21 @@ const AuthForm = ({ mode }: AuthFormProps) => {
         }
       }
     } catch (error: any) {
+      clearTimeout(timeoutId);
       console.error('Auth form error:', error);
       
       let errorMessage = "An unexpected error occurred. Please try again.";
       
       // Handle specific error types
-      if (error?.message?.includes('{}') || error?.status === 503) {
+      if (error?.message?.includes('{}') || error?.status === 503 || error?.message?.includes('Failed to fetch')) {
         setConnectionError(true);
         errorMessage = "Unable to connect to authentication service. Please check your internet connection and try again.";
       } else if (error?.message?.includes('Invalid login credentials')) {
         errorMessage = "Invalid email or password. Please check your credentials and try again.";
       } else if (error?.message?.includes('User already registered')) {
         errorMessage = "An account with this email already exists. Please sign in instead.";
+      } else if (error?.message?.includes('timeout') || error?.message?.includes('Timeout')) {
+        errorMessage = "The request timed out. Please try again.";
       } else if (error?.message) {
         errorMessage = error.message;
       }

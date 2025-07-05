@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,10 +32,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     let mounted = true;
+    let profileFetchTimeout: NodeJS.Timeout;
+
+    console.log('AuthProvider: Starting initialization');
 
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -44,12 +47,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (!mounted) return;
 
+      // Clear any existing timeout
+      if (profileFetchTimeout) {
+        clearTimeout(profileFetchTimeout);
+      }
+
       if (session?.user) {
         console.log('User session found, fetching profile...');
-        await fetchUserProfile(session.user);
         
-        // Navigate to dashboard after successful authentication and profile fetch
-        if (event === 'SIGNED_IN') {
+        // Set a timeout to prevent hanging indefinitely
+        profileFetchTimeout = setTimeout(() => {
+          console.log('Profile fetch timeout, using fallback user data');
+          if (mounted) {
+            const fallbackUser: User = {
+              id: session.user.id,
+              name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
+              email: session.user.email || '',
+              role: (session.user.user_metadata?.role as UserRole) || 'patient',
+              profileCompleted: false,
+            };
+            setUser(fallbackUser);
+            setIsLoading(false);
+            setIsInitialized(true);
+          }
+        }, 10000); // 10 second timeout
+
+        try {
+          await fetchUserProfile(session.user);
+          if (profileFetchTimeout) {
+            clearTimeout(profileFetchTimeout);
+          }
+        } catch (error) {
+          console.error('Profile fetch failed, using fallback');
+          if (profileFetchTimeout) {
+            clearTimeout(profileFetchTimeout);
+          }
+        }
+        
+        // Navigate to dashboard after successful authentication
+        if (event === 'SIGNED_IN' && mounted) {
           console.log('Navigating to dashboard after sign in');
           setTimeout(() => navigate('/dashboard'), 100);
         }
@@ -57,31 +93,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log('No session, clearing user state');
         setUser(null);
         setIsLoading(false);
+        setIsInitialized(true);
       }
     });
 
-    // Then check for existing session
+    // Then check for existing session with timeout
     const initializeAuth = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        console.log('Checking for existing session...');
+        
+        // Set a timeout for the initial session check
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session check timeout')), 5000)
+        );
+        
+        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]) as any;
         
         if (error) {
           console.error('Error getting initial session:', error);
-          setIsLoading(false);
+          if (mounted) {
+            setIsLoading(false);
+            setIsInitialized(true);
+          }
           return;
         }
 
-        console.log('Initial session check:', session?.user?.email);
+        console.log('Initial session check:', session?.user?.email || 'No session');
         
         if (session?.user && mounted) {
           await fetchUserProfile(session.user);
         } else if (mounted) {
           setIsLoading(false);
+          setIsInitialized(true);
         }
       } catch (error) {
         console.error('Error in initializeAuth:', error);
         if (mounted) {
           setIsLoading(false);
+          setIsInitialized(true);
         }
       }
     };
@@ -90,6 +140,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => {
       mounted = false;
+      if (profileFetchTimeout) {
+        clearTimeout(profileFetchTimeout);
+      }
       subscription.unsubscribe();
     };
   }, [navigate]);
@@ -98,11 +151,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log('Fetching profile for user:', authUser.id);
       
-      const { data: profile, error } = await supabase
+      // Add timeout to profile fetch
+      const profilePromise = supabase
         .from('profiles')
         .select('*')
         .eq('id', authUser.id)
         .single();
+        
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 8000)
+      );
+      
+      const { data: profile, error } = await Promise.race([profilePromise, timeoutPromise]) as any;
 
       if (error && error.code !== 'PGRST116') {
         console.error('Error fetching profile:', error);
@@ -153,6 +213,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(fallbackUser);
     } finally {
       setIsLoading(false);
+      setIsInitialized(true);
     }
   };
 
@@ -272,8 +333,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   console.log('Auth context state:', { 
     isAuthenticated: !!user, 
     isLoading, 
+    isInitialized,
     userEmail: user?.email 
   });
+
+  // Don't render children until auth is initialized to prevent useAuth errors
+  if (!isInitialized) {
+    return (
+      <AuthContext.Provider value={contextValue}>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </AuthContext.Provider>
+    );
+  }
 
   return (
     <AuthContext.Provider value={contextValue}>
