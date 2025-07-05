@@ -36,26 +36,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session check:', session?.user?.email);
-      if (session?.user) {
-        fetchUserProfile(session.user);
-      } else {
-        setIsLoading(false);
-      }
-    });
+    let mounted = true;
 
-    // Listen for auth changes
+    // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session?.user?.email);
       
+      if (!mounted) return;
+
       if (session?.user) {
+        console.log('User session found, fetching profile...');
         await fetchUserProfile(session.user);
+        
         // Navigate to dashboard after successful authentication and profile fetch
         if (event === 'SIGNED_IN') {
           console.log('Navigating to dashboard after sign in');
-          navigate('/dashboard');
+          setTimeout(() => navigate('/dashboard'), 100);
         }
       } else {
         console.log('No session, clearing user state');
@@ -64,7 +60,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Then check for existing session
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting initial session:', error);
+          setIsLoading(false);
+          return;
+        }
+
+        console.log('Initial session check:', session?.user?.email);
+        
+        if (session?.user && mounted) {
+          await fetchUserProfile(session.user);
+        } else if (mounted) {
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error('Error in initializeAuth:', error);
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    initializeAuth();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   const fetchUserProfile = async (authUser: SupabaseUser) => {
@@ -77,27 +104,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .eq('id', authUser.id)
         .single();
 
-      if (error) {
+      if (error && error.code !== 'PGRST116') {
         console.error('Error fetching profile:', error);
-        
-        // If profiles table doesn't exist or user doesn't have a profile yet,
-        // create a basic user object from auth metadata
-        const fallbackUser: User = {
-          id: authUser.id,
-          name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
-          email: authUser.email || '',
-          role: (authUser.user_metadata?.role as UserRole) || 'patient',
-          profileCompleted: false,
-        };
-        
-        console.log('Using fallback user data:', fallbackUser);
-        setUser(fallbackUser);
-        setIsLoading(false);
-        return;
+        throw error;
       }
 
+      let userData: User;
+
       if (profile) {
-        const userData: User = {
+        userData = {
           id: profile.id,
           name: profile.name,
           email: profile.email,
@@ -109,12 +124,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           verified: profile.verified,
         };
         console.log('Setting user from profile:', userData);
-        setUser(userData);
+      } else {
+        // Create fallback user from auth metadata
+        userData = {
+          id: authUser.id,
+          name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
+          email: authUser.email || '',
+          role: (authUser.user_metadata?.role as UserRole) || 'patient',
+          profileCompleted: false,
+        };
+        console.log('Using fallback user data:', userData);
       }
+      
+      setUser(userData);
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
       
-      // Create fallback user from auth data
+      // Always create fallback user to prevent auth blocking
       const fallbackUser: User = {
         id: authUser.id,
         name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
@@ -142,7 +168,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (error) {
         console.error('Login error:', error);
-        setIsLoading(false);
         throw error;
       }
 
@@ -155,6 +180,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signup = async (name: string, email: string, password: string, role: UserRole) => {
+    console.log('Starting signup process for:', email);
     setIsLoading(true);
     
     try {
@@ -165,24 +191,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           data: {
             name,
             role,
-          }
+          },
+          emailRedirectTo: `${window.location.origin}/dashboard`
         }
       });
       
       if (error) {
-        setIsLoading(false);
+        console.error('Signup error:', error);
         throw error;
       }
 
+      console.log('Signup response:', data);
+
       // Check if user needs email confirmation
       if (data.user && !data.session) {
+        console.log('Email confirmation required');
         setIsLoading(false);
         return { needsConfirmation: true };
       }
 
-      // If session exists (email confirmation disabled), the auth state change listener will handle navigation
+      console.log('Signup successful, session created');
+      // If session exists, the auth state change listener will handle navigation
       return {};
     } catch (error) {
+      console.error('Signup process error:', error);
       setIsLoading(false);
       throw error;
     }
@@ -190,9 +222,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     console.log('Logging out user');
-    await supabase.auth.signOut();
-    setUser(null);
-    navigate('/');
+    setIsLoading(true);
+    
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      navigate('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const updateUserProfile = async (userData: Partial<User>) => {
