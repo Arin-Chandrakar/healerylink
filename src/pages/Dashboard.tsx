@@ -1,10 +1,12 @@
+
 import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import Navbar from '@/components/Navbar';
 import ProfileCard from '@/components/ProfileCard';
+import HealthIssueReport from '@/components/HealthIssueReport';
 import { useAuth } from '@/context/AuthContext';
-import { CalendarClock, Clock, MessageSquare, Search, User } from 'lucide-react';
+import { CalendarClock, Clock, MessageSquare, Search, User, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -112,6 +114,7 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [showAllDoctors, setShowAllDoctors] = useState(false);
   const [appointments, setAppointments] = useState(initialAppointments);
+  const [showHealthReport, setShowHealthReport] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -131,6 +134,15 @@ const Dashboard = () => {
 
   if (!isAuthenticated) {
     return <Navigate to="/sign-in" />;
+  }
+
+  // Redirect to profile completion if needed
+  if (!user?.profileCompleted) {
+    if (user?.role === 'doctor') {
+      return <Navigate to="/doctor-profile" />;
+    } else {
+      return <Navigate to="/patient-profile" />;
+    }
   }
 
   const filteredDoctors = mockDoctors.filter(doctor => 
@@ -246,7 +258,17 @@ const Dashboard = () => {
               </p>
             </div>
             
-            <div className="flex-1 md:flex-initial w-full md:w-auto md:max-w-md">
+            <div className="flex gap-3">
+              {user?.role === 'patient' && (
+                <Button
+                  onClick={() => setShowHealthReport(true)}
+                  className="bg-red-500 hover:bg-red-600 text-white"
+                >
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  Report Health Issue
+                </Button>
+              )}
+              
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
@@ -465,6 +487,11 @@ const Dashboard = () => {
           </TabsContent>
         </Tabs>
       </div>
+      
+      {showHealthReport && (
+        <HealthIssueReport onClose={() => setShowHealthReport(false)} />
+      )}
+      
       <GeminiChatbox />
     </div>
   );

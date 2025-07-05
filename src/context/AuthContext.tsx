@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -70,7 +71,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setIsLoading(false);
             setIsInitialized(true);
           }
-        }, 10000); // 10 second timeout
+        }, 10000);
 
         try {
           await fetchUserProfile(session.user);
@@ -84,10 +85,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         }
         
-        // Navigate to dashboard after successful authentication
+        // Navigate after successful authentication
         if (event === 'SIGNED_IN' && mounted) {
-          console.log('Navigating to dashboard after sign in');
-          setTimeout(() => navigate('/dashboard'), 100);
+          console.log('Navigating after sign in');
+          setTimeout(() => {
+            // Check if profile is completed and navigate accordingly
+            const userRole = session.user.user_metadata?.role;
+            if (!session.user.user_metadata?.profileCompleted) {
+              if (userRole === 'doctor') {
+                navigate('/doctor-profile');
+              } else {
+                navigate('/patient-profile');
+              }
+            } else {
+              navigate('/dashboard');
+            }
+          }, 100);
         }
       } else {
         console.log('No session, clearing user state');
@@ -102,7 +115,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         console.log('Checking for existing session...');
         
-        // Set a timeout for the initial session check
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Session check timeout')), 5000)
@@ -151,7 +163,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log('Fetching profile for user:', authUser.id);
       
-      // Add timeout to profile fetch
       const profilePromise = supabase
         .from('profiles')
         .select('*')
@@ -185,7 +196,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
         console.log('Setting user from profile:', userData);
       } else {
-        // Create fallback user from auth metadata
         userData = {
           id: authUser.id,
           name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
@@ -200,7 +210,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
       
-      // Always create fallback user to prevent auth blocking
       const fallbackUser: User = {
         id: authUser.id,
         name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
@@ -315,7 +324,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error) {
       console.error('Error updating profile:', error);
-      // Still update local state even if database update fails
       setUser({ ...user, ...userData });
     }
   };
@@ -334,10 +342,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isAuthenticated: !!user, 
     isLoading, 
     isInitialized,
-    userEmail: user?.email 
+    userEmail: user?.email,
+    profileCompleted: user?.profileCompleted
   });
 
-  // Don't render children until auth is initialized to prevent useAuth errors
   if (!isInitialized) {
     return (
       <AuthContext.Provider value={contextValue}>
