@@ -1,13 +1,12 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Upload, FileText, Send, Loader2 } from 'lucide-react';
+import { Upload, FileText, Send, Loader2, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 
 interface HealthIssueReportProps {
   onClose: () => void;
@@ -16,6 +15,7 @@ interface HealthIssueReportProps {
 const HealthIssueReport = ({ onClose }: HealthIssueReportProps) => {
   const [description, setDescription] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [apiKey, setApiKey] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState('');
 
@@ -42,6 +42,11 @@ const HealthIssueReport = ({ onClose }: HealthIssueReportProps) => {
       return;
     }
 
+    if (!apiKey.trim()) {
+      toast.error('Please enter your Gemini API key');
+      return;
+    }
+
     setIsAnalyzing(true);
     
     try {
@@ -51,23 +56,57 @@ const HealthIssueReport = ({ onClose }: HealthIssueReportProps) => {
         const base64Data = reader.result as string;
         const base64Content = base64Data.split(',')[1];
 
-        // Call Gemini analysis edge function
-        const { data, error } = await supabase.functions.invoke('analyze-health-document', {
-          body: {
-            description,
-            pdfData: base64Content,
-            fileName: file.name
+        try {
+          // Call Gemini API directly from frontend
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  {
+                    text: `Please analyze this medical document and provide insights based on the patient's description: "${description}". 
+
+Please provide:
+1. Summary of key findings from the document
+2. Potential health concerns or abnormalities
+3. Recommendations for follow-up care
+4. Important notes or warnings
+
+Remember to be professional and note that this analysis is for informational purposes only and should not replace professional medical advice.`
+                  },
+                  {
+                    inline_data: {
+                      mime_type: "application/pdf",
+                      data: base64Content
+                    }
+                  }
+                ]
+              }],
+              generationConfig: {
+                temperature: 0.3,
+                maxOutputTokens: 1024,
+              }
+            }),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Gemini API error:', errorText);
+            throw new Error(`Gemini API error: ${response.status}`);
           }
-        });
 
-        if (error) {
+          const data = await response.json();
+          const analysisResult = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No analysis available';
+
+          setAnalysis(analysisResult);
+          toast.success('Document analyzed successfully');
+        } catch (error) {
           console.error('Analysis error:', error);
-          toast.error('Failed to analyze document');
-          return;
+          toast.error('Failed to analyze document. Please check your API key.');
         }
-
-        setAnalysis(data.analysis);
-        toast.success('Document analyzed successfully');
       };
 
       reader.onerror = () => {
@@ -139,9 +178,34 @@ const HealthIssueReport = ({ onClose }: HealthIssueReportProps) => {
             </div>
           </div>
 
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              <Key className="h-4 w-4 inline mr-1" />
+              Gemini API Key
+            </label>
+            <Input
+              type="password"
+              placeholder="Enter your Gemini API key..."
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              className="w-full"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Get your API key from{' '}
+              <a 
+                href="https://makersuite.google.com/app/apikey" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:underline"
+              >
+                Google AI Studio
+              </a>
+            </p>
+          </div>
+
           <Button
             onClick={handleSubmit}
-            disabled={isAnalyzing || !description.trim() || !file}
+            disabled={isAnalyzing || !description.trim() || !file || !apiKey.trim()}
             className="w-full"
           >
             {isAnalyzing ? (
