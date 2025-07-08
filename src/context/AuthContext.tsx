@@ -179,10 +179,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [navigate]);
 
   useEffect(() => {
-    if (isAuthenticated && user && !isLoading) {
+    if (!!user && user && !isLoading) {
       navigateAfterAuth();
     }
-  }, [isAuthenticated, user, isLoading, navigateAfterAuth]);
+  }, [user, isLoading, navigateAfterAuth]);
 
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
