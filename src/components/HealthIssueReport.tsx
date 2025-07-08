@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -22,6 +23,7 @@ const HealthIssueReport = ({ onClose }: HealthIssueReportProps) => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
+      console.log('File selected:', selectedFile.name, selectedFile.type);
       if (selectedFile.type === 'application/pdf') {
         setFile(selectedFile);
         toast.success('PDF file selected');
@@ -32,6 +34,8 @@ const HealthIssueReport = ({ onClose }: HealthIssueReportProps) => {
   };
 
   const handleSubmit = async () => {
+    console.log('Starting analysis with:', { description: description.trim(), hasFile: !!file, hasApiKey: !!apiKey.trim() });
+    
     if (!description.trim()) {
       toast.error('Please provide a description of your health issue');
       return;
@@ -55,6 +59,8 @@ const HealthIssueReport = ({ onClose }: HealthIssueReportProps) => {
       reader.onload = async () => {
         const base64Data = reader.result as string;
         const base64Content = base64Data.split(',')[1];
+
+        console.log('PDF converted to base64, calling Gemini API...');
 
         try {
           // Call Gemini API directly from frontend
@@ -97,6 +103,8 @@ Remember to be professional and note that this analysis is for informational pur
             }),
           });
 
+          console.log('Gemini API response status:', response.status);
+
           if (!response.ok) {
             const errorText = await response.text();
             console.error('Gemini API error:', errorText);
@@ -104,10 +112,20 @@ Remember to be professional and note that this analysis is for informational pur
           }
 
           const data = await response.json();
+          console.log('Gemini API response data:', data);
+          
           const analysisResult = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No analysis available';
+          console.log('Analysis result:', analysisResult);
 
           // Close the modal and navigate to the analysis page
           onClose();
+          
+          console.log('Navigating to health analysis with:', {
+            analysisData: analysisResult,
+            fileName: file.name,
+            description: description
+          });
+          
           navigate('/health-analysis', {
             state: {
               analysisData: analysisResult,
@@ -119,11 +137,12 @@ Remember to be professional and note that this analysis is for informational pur
           toast.success('Document analyzed successfully! Redirecting to detailed analysis...');
         } catch (error) {
           console.error('Analysis error:', error);
-          toast.error('Failed to analyze document. Please check your API key.');
+          toast.error('Failed to analyze document. Please check your API key and try again.');
         }
       };
 
       reader.onerror = () => {
+        console.error('File reader error');
         toast.error('Failed to read PDF file');
       };
 
