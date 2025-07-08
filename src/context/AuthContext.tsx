@@ -1,5 +1,4 @@
-
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { User as SupabaseUser } from '@supabase/supabase-js';
@@ -35,6 +34,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
   const navigate = useNavigate();
+
+  const navigateAfterAuth = useCallback(() => {
+    if (!user) return;
+    
+    console.log('Navigating after sign in/up, user:', user);
+    
+    // If profile is not completed, redirect to appropriate profile page
+    if (!user.profileCompleted) {
+      if (user.role === 'doctor') {
+        console.log('Redirecting to doctor profile');
+        navigate('/doctor-profile');
+      } else if (user.role === 'patient') {
+        console.log('Redirecting to patient profile');
+        navigate('/patient-profile');
+      }
+    } else {
+      console.log('Profile completed, redirecting to dashboard');
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
 
   useEffect(() => {
     let mounted = true;
@@ -158,6 +177,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       subscription.unsubscribe();
     };
   }, [navigate]);
+
+  useEffect(() => {
+    if (isAuthenticated && user && !isLoading) {
+      navigateAfterAuth();
+    }
+  }, [isAuthenticated, user, isLoading, navigateAfterAuth]);
 
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {

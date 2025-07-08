@@ -1,5 +1,5 @@
-
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Upload, FileText, Send, Loader2, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,7 @@ const HealthIssueReport = ({ onClose }: HealthIssueReportProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [apiKey, setApiKey] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysis, setAnalysis] = useState('');
+  const navigate = useNavigate();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -67,13 +67,18 @@ const HealthIssueReport = ({ onClose }: HealthIssueReportProps) => {
               contents: [{
                 parts: [
                   {
-                    text: `Please analyze this medical document and provide insights based on the patient's description: "${description}". 
+                    text: `Please analyze this medical document and provide a comprehensive analysis based on the patient's description: "${description}". 
 
 Please provide:
 1. Summary of key findings from the document
-2. Potential health concerns or abnormalities
-3. Recommendations for follow-up care
-4. Important notes or warnings
+2. Detailed health metrics and values (with units)
+3. Potential health concerns or abnormalities
+4. Risk factors identified
+5. Recommendations for follow-up care
+6. Trends or patterns in the data
+7. Important notes or warnings
+
+Structure your response with clear sections and include specific numerical values where available. This analysis will be used to create data visualizations and charts.
 
 Remember to be professional and note that this analysis is for informational purposes only and should not replace professional medical advice.`
                   },
@@ -87,7 +92,7 @@ Remember to be professional and note that this analysis is for informational pur
               }],
               generationConfig: {
                 temperature: 0.3,
-                maxOutputTokens: 1024,
+                maxOutputTokens: 2048,
               }
             }),
           });
@@ -101,8 +106,17 @@ Remember to be professional and note that this analysis is for informational pur
           const data = await response.json();
           const analysisResult = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No analysis available';
 
-          setAnalysis(analysisResult);
-          toast.success('Document analyzed successfully');
+          // Close the modal and navigate to the analysis page
+          onClose();
+          navigate('/health-analysis', {
+            state: {
+              analysisData: analysisResult,
+              fileName: file.name,
+              description: description
+            }
+          });
+
+          toast.success('Document analyzed successfully! Redirecting to detailed analysis...');
         } catch (error) {
           console.error('Analysis error:', error);
           toast.error('Failed to analyze document. Please check your API key.');
@@ -220,15 +234,6 @@ Remember to be professional and note that this analysis is for informational pur
               </>
             )}
           </Button>
-
-          {analysis && (
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-              <h3 className="font-medium text-blue-900 mb-2">AI Analysis Result:</h3>
-              <div className="text-sm text-blue-800 whitespace-pre-wrap">
-                {analysis}
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
     </motion.div>
