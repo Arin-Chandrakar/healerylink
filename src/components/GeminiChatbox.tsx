@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from "react";
 import { MessageSquare, Send } from "lucide-react";
 import { Button } from "./ui/button";
@@ -41,9 +42,16 @@ export default function GeminiChatbox() {
     toast.success("API key removed");
   };
 
-  const sendWithGemini = async (userPrompt: string) => {
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  const sendWithGemini = async (userPrompt: string, retryCount = 0) => {
+    const maxRetries = 3;
+    const baseDelay = 2000; // 2 seconds
+    
     setLoading(true);
     try {
+      console.log(`Attempting Gemini API call (attempt ${retryCount + 1}/${maxRetries + 1})`);
+      
       const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -62,20 +70,46 @@ export default function GeminiChatbox() {
         }),
       });
       
+      console.log(`Gemini API response status: ${response.status}`);
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || "Failed to get response from Gemini");
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
+        
+        // Handle specific error cases
+        if (response.status === 503 || errorMessage.includes("overloaded")) {
+          if (retryCount < maxRetries) {
+            const delayTime = baseDelay * Math.pow(2, retryCount); // Exponential backoff
+            console.log(`API overloaded, retrying in ${delayTime}ms...`);
+            toast.warning(`API is busy, retrying in ${delayTime/1000} seconds...`);
+            
+            await delay(delayTime);
+            return sendWithGemini(userPrompt, retryCount + 1);
+          } else {
+            throw new Error("The Gemini API is currently overloaded. Please try again in a few minutes.");
+          }
+        } else if (response.status === 429) {
+          throw new Error("Rate limit exceeded. Please wait a moment before trying again.");
+        } else if (response.status === 401 || response.status === 403) {
+          throw new Error("Invalid API key. Please check your Gemini API key.");
+        } else {
+          throw new Error(errorMessage);
+        }
       }
 
       const data = await response.json();
-      const aiText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn't understand that.";
+      console.log('Gemini API response received successfully');
+      
+      const aiText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn't generate a response.";
       setMessages((prev) => [...prev, { role: "ai", content: aiText }]);
+      
     } catch (error) {
       console.error("Gemini API error:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to contact Gemini API");
+      const errorMessage = error instanceof Error ? error.message : "Failed to contact Gemini API";
+      toast.error(errorMessage);
       setMessages((prev) => [
         ...prev,
-        { role: "ai", content: "There was an error contacting Gemini API." }
+        { role: "ai", content: `Error: ${errorMessage}` }
       ]);
     } finally {
       setLoading(false);
@@ -182,7 +216,9 @@ export default function GeminiChatbox() {
                   m.role === "user" 
                     ? "bg-primary text-primary-foreground" 
                     : "bg-gray-100 text-gray-800"
-                } px-3 py-2 rounded-2xl text-sm max-w-[70%]`}>
+                } px-3 py-2 rounded-2xl text-sm max-w-[70%] ${
+                  m.content.startsWith("Error:") ? "border-red-200 bg-red-50 text-red-800" : ""
+                }`}>
                   {m.content}
                 </div>
               </div>
@@ -192,7 +228,11 @@ export default function GeminiChatbox() {
         )}
         {loading && (
           <div className="flex justify-center text-xs text-gray-500 pt-2">
-            Thinking...
+            <div className="flex items-center space-x-1">
+              <div className="animate-bounce">●</div>
+              <div className="animate-bounce delay-100">●</div>
+              <div className="animate-bounce delay-200">●</div>
+            </div>
           </div>
         )}
       </div>
