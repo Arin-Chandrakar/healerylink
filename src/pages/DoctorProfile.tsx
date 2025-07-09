@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const doctorProfileSchema = z.object({
   specialty: z.string().min(1, { message: 'Specialty is required' }),
@@ -70,6 +71,10 @@ const DoctorProfile = () => {
     },
   });
 
+  console.log('DoctorProfile - User state:', user);
+  console.log('DoctorProfile - isAuthenticated:', isAuthenticated);
+  console.log('DoctorProfile - isLoading:', isLoading);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-white">
@@ -81,26 +86,56 @@ const DoctorProfile = () => {
     );
   }
 
-  if (!isAuthenticated || user?.role !== 'doctor') {
-    return <Navigate to="/sign-in" />;
+  if (!isAuthenticated) {
+    console.log('Not authenticated, redirecting to sign-in');
+    return <Navigate to="/sign-in" replace />;
   }
 
-  if (user?.profileCompleted) {
-    return <Navigate to="/dashboard" />;
+  if (!user) {
+    console.log('No user data, redirecting to sign-in');
+    return <Navigate to="/sign-in" replace />;
+  }
+
+  if (user.role !== 'doctor') {
+    console.log('User is not a doctor, redirecting to dashboard');
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (user.profileCompleted) {
+    console.log('Profile already completed, redirecting to dashboard');
+    return <Navigate to="/dashboard" replace />;
   }
 
   const onSubmit = async (values: DoctorProfileValues) => {
     setIsSubmitting(true);
     
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('Submitting doctor profile:', values);
       
-      // Update user profile
+      // Create or update profile in database
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          specialty: values.specialty,
+          location: `${values.city}, ${values.state}`,
+          // Add other fields as needed
+        });
+
+      if (error) {
+        console.error('Error saving profile:', error);
+        throw error;
+      }
+      
+      // Update user profile in context
       updateUserProfile({
         ...user,
         profileCompleted: true,
-        // Here you would add the doctor-specific fields
+        specialty: values.specialty,
+        location: `${values.city}, ${values.state}`,
       });
       
       toast({
@@ -110,6 +145,7 @@ const DoctorProfile = () => {
       
       navigate('/dashboard');
     } catch (error) {
+      console.error('Profile submission error:', error);
       toast({
         title: "Error",
         description: "There was a problem saving your profile.",

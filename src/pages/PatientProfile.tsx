@@ -14,6 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const patientProfileSchema = z.object({
   dateOfBirth: z.string().min(1, { message: 'Date of birth is required' }),
@@ -59,6 +60,10 @@ const PatientProfile = () => {
     },
   });
 
+  console.log('PatientProfile - User state:', user);
+  console.log('PatientProfile - isAuthenticated:', isAuthenticated);
+  console.log('PatientProfile - isLoading:', isLoading);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-white">
@@ -70,26 +75,54 @@ const PatientProfile = () => {
     );
   }
 
-  if (!isAuthenticated || user?.role !== 'patient') {
-    return <Navigate to="/sign-in" />;
+  if (!isAuthenticated) {
+    console.log('Not authenticated, redirecting to sign-in');
+    return <Navigate to="/sign-in" replace />;
   }
 
-  if (user?.profileCompleted) {
-    return <Navigate to="/dashboard" />;
+  if (!user) {
+    console.log('No user data, redirecting to sign-in');
+    return <Navigate to="/sign-in" replace />;
+  }
+
+  if (user.role !== 'patient') {
+    console.log('User is not a patient, redirecting to dashboard');
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (user.profileCompleted) {
+    console.log('Profile already completed, redirecting to dashboard');
+    return <Navigate to="/dashboard" replace />;
   }
 
   const onSubmit = async (values: PatientProfileValues) => {
     setIsSubmitting(true);
     
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('Submitting patient profile:', values);
       
-      // Update user profile
+      // Create or update profile in database
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          location: `${values.city}, ${values.state}`,
+          // Add other fields as needed
+        });
+
+      if (error) {
+        console.error('Error saving profile:', error);
+        throw error;
+      }
+      
+      // Update user profile in context
       updateUserProfile({
         ...user,
         profileCompleted: true,
-        // Here you would add the patient-specific fields
+        location: `${values.city}, ${values.state}`,
       });
       
       toast({
@@ -99,6 +132,7 @@ const PatientProfile = () => {
       
       navigate('/dashboard');
     } catch (error) {
+      console.error('Profile submission error:', error);
       toast({
         title: "Error",
         description: "There was a problem saving your profile.",

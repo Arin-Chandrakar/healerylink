@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,113 +34,61 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [hasNavigated, setHasNavigated] = useState(false);
   const navigate = useNavigate();
 
-  const navigateAfterAuth = useCallback(() => {
-    if (!user) return;
+  const navigateBasedOnProfile = useCallback((userData: User) => {
+    // Prevent multiple navigations
+    if (hasNavigated) return;
     
-    console.log('Navigating after sign in/up, user:', user);
+    console.log('Checking navigation for user:', userData);
     
-    // If profile is not completed, redirect to appropriate profile page
-    if (!user.profileCompleted) {
-      if (user.role === 'doctor') {
+    // Only navigate if profile is not completed
+    if (!userData.profileCompleted) {
+      console.log('Profile not completed, navigating to profile page');
+      setHasNavigated(true);
+      
+      if (userData.role === 'doctor') {
         console.log('Redirecting to doctor profile');
-        navigate('/doctor-profile');
-      } else if (user.role === 'patient') {
-        console.log('Redirecting to patient profile');
-        navigate('/patient-profile');
+        navigate('/doctor-profile', { replace: true });
+      } else if (userData.role === 'patient') {
+        console.log('Redirecting to patient profile');  
+        navigate('/patient-profile', { replace: true });
       }
     } else {
-      console.log('Profile completed, redirecting to dashboard');
-      navigate('/dashboard');
+      console.log('Profile completed, staying on current page or going to dashboard');
     }
-  }, [user, navigate]);
+  }, [navigate, hasNavigated]);
 
   useEffect(() => {
     let mounted = true;
-    let profileFetchTimeout: NodeJS.Timeout;
-
+    
     console.log('AuthProvider: Starting initialization');
 
-    // Set up auth state listener first
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session?.user?.email);
       
       if (!mounted) return;
 
-      // Clear any existing timeout
-      if (profileFetchTimeout) {
-        clearTimeout(profileFetchTimeout);
-      }
-
       if (session?.user) {
         console.log('User session found, fetching profile...');
-        
-        // Set a timeout to prevent hanging indefinitely
-        profileFetchTimeout = setTimeout(() => {
-          console.log('Profile fetch timeout, using fallback user data');
-          if (mounted) {
-            const fallbackUser: User = {
-              id: session.user.id,
-              name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
-              email: session.user.email || '',
-              role: (session.user.user_metadata?.role as UserRole) || 'patient',
-              profileCompleted: false,
-            };
-            setUser(fallbackUser);
-            setIsLoading(false);
-            setIsInitialized(true);
-          }
-        }, 10000);
-
-        try {
-          await fetchUserProfile(session.user);
-          if (profileFetchTimeout) {
-            clearTimeout(profileFetchTimeout);
-          }
-        } catch (error) {
-          console.error('Profile fetch failed, using fallback');
-          if (profileFetchTimeout) {
-            clearTimeout(profileFetchTimeout);
-          }
-        }
-        
-        // Navigate after successful authentication
-        if (event === 'SIGNED_IN' && mounted) {
-          console.log('Navigating after sign in');
-          setTimeout(() => {
-            // Check if profile is completed and navigate accordingly
-            const userRole = session.user.user_metadata?.role;
-            if (!session.user.user_metadata?.profileCompleted) {
-              if (userRole === 'doctor') {
-                navigate('/doctor-profile');
-              } else {
-                navigate('/patient-profile');
-              }
-            } else {
-              navigate('/dashboard');
-            }
-          }, 100);
-        }
+        await fetchUserProfile(session.user);
       } else {
         console.log('No session, clearing user state');
         setUser(null);
         setIsLoading(false);
         setIsInitialized(true);
+        setHasNavigated(false);
       }
     });
 
-    // Then check for existing session with timeout
+    // Check for existing session
     const initializeAuth = async () => {
       try {
         console.log('Checking for existing session...');
         
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Session check timeout')), 5000)
-        );
-        
-        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('Error getting initial session:', error);
@@ -171,34 +120,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => {
       mounted = false;
-      if (profileFetchTimeout) {
-        clearTimeout(profileFetchTimeout);
-      }
       subscription.unsubscribe();
     };
-  }, [navigate]);
-
-  useEffect(() => {
-    if (!!user && user && !isLoading) {
-      navigateAfterAuth();
-    }
-  }, [user, isLoading, navigateAfterAuth]);
+  }, []);
 
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
       console.log('Fetching profile for user:', authUser.id);
       
-      const profilePromise = supabase
+      const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', authUser.id)
         .single();
-        
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Profile fetch timeout')), 8000)
-      );
-      
-      const { data: profile, error } = await Promise.race([profilePromise, timeoutPromise]) as any;
 
       if (error && error.code !== 'PGRST116') {
         console.error('Error fetching profile:', error);
@@ -213,7 +147,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           name: profile.name,
           email: profile.email,
           role: profile.role as UserRole,
-          profileCompleted: true,
+          profileCompleted: true, // If profile exists in DB, it's completed
           imageUrl: profile.image_url,
           location: profile.location,
           specialty: profile.specialty,
@@ -221,30 +155,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
         console.log('Setting user from profile:', userData);
       } else {
+        // Profile doesn't exist in DB, so it's not completed
         userData = {
           id: authUser.id,
           name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
           email: authUser.email || '',
           role: (authUser.user_metadata?.role as UserRole) || 'patient',
-          profileCompleted: false,
+          profileCompleted: false, // This is key - profile is NOT completed
         };
-        console.log('Using fallback user data:', userData);
+        console.log('Using user data without profile (not completed):', userData);
       }
       
       setUser(userData);
+      
+      // Navigate based on profile completion status
+      setTimeout(() => {
+        navigateBasedOnProfile(userData);
+      }, 100);
+      
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
       
+      // Even in error case, don't assume profile is completed
       const fallbackUser: User = {
         id: authUser.id,
         name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
         email: authUser.email || '',
         role: (authUser.user_metadata?.role as UserRole) || 'patient',
-        profileCompleted: false,
+        profileCompleted: false, // Keep as false since we couldn't verify
       };
       
       console.log('Using fallback user data after error:', fallbackUser);
       setUser(fallbackUser);
+      
+      setTimeout(() => {
+        navigateBasedOnProfile(fallbackUser);
+      }, 100);
     } finally {
       setIsLoading(false);
       setIsInitialized(true);
@@ -254,6 +200,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     console.log('Starting login process for:', email);
     setIsLoading(true);
+    setHasNavigated(false); // Reset navigation flag
     
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -267,7 +214,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       console.log('Login successful:', data.user?.email);
-      // User profile will be fetched and navigation will happen in the auth state change listener
     } catch (error) {
       setIsLoading(false);
       throw error;
@@ -277,6 +223,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signup = async (name: string, email: string, password: string, role: UserRole) => {
     console.log('Starting signup process for:', email);
     setIsLoading(true);
+    setHasNavigated(false); // Reset navigation flag
     
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -306,7 +253,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       console.log('Signup successful, session created');
-      // If session exists, the auth state change listener will handle navigation
       return {};
     } catch (error) {
       console.error('Signup process error:', error);
@@ -318,6 +264,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     console.log('Logging out user');
     setIsLoading(true);
+    setHasNavigated(false); // Reset navigation flag
     
     try {
       await supabase.auth.signOut();
@@ -345,11 +292,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .eq('id', user.id);
 
       if (!error) {
-        setUser({ ...user, ...userData });
+        const updatedUser = { ...user, ...userData };
+        setUser(updatedUser);
+        console.log('Profile updated successfully:', updatedUser);
       }
     } catch (error) {
       console.error('Error updating profile:', error);
-      setUser({ ...user, ...userData });
+      const updatedUser = { ...user, ...userData };
+      setUser(updatedUser);
     }
   };
 
@@ -368,7 +318,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isLoading, 
     isInitialized,
     userEmail: user?.email,
-    profileCompleted: user?.profileCompleted
+    profileCompleted: user?.profileCompleted,
+    hasNavigated
   });
 
   if (!isInitialized) {
