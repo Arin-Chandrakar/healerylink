@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -126,7 +127,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUserProfile = async (authUser: SupabaseUser) => {
     try {
       console.log('Fetching profile for user:', authUser.id);
-      console.log('User metadata:', authUser.user_metadata);
       
       const { data: profile, error } = await supabase
         .from('profiles')
@@ -134,22 +134,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .eq('id', authUser.id)
         .single();
 
-      console.log('Profile query result:', { profile, error });
-
       if (error && error.code !== 'PGRST116') {
         console.error('Error fetching profile:', error);
-        // Don't throw - continue with fallback user data
+        throw error;
       }
 
       let userData: User;
 
-      if (profile && !error) {
+      if (profile) {
         userData = {
           id: profile.id,
           name: profile.name,
           email: profile.email,
           role: profile.role as UserRole,
-          profileCompleted: true,
+          profileCompleted: true, // If profile exists in DB, it's completed
           imageUrl: profile.image_url,
           location: profile.location,
           specialty: profile.specialty,
@@ -157,15 +155,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
         console.log('Setting user from profile:', userData);
       } else {
-        // Profile doesn't exist in DB or error occurred
+        // Profile doesn't exist in DB, so it's not completed
         userData = {
           id: authUser.id,
           name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
           email: authUser.email || '',
           role: (authUser.user_metadata?.role as UserRole) || 'patient',
-          profileCompleted: false,
+          profileCompleted: false, // This is key - profile is NOT completed
         };
-        console.log('Using fallback user data:', userData);
+        console.log('Using user data without profile (not completed):', userData);
       }
       
       setUser(userData);
@@ -176,15 +174,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }, 100);
       
     } catch (error) {
-      console.error('Unexpected error in fetchUserProfile:', error);
+      console.error('Error in fetchUserProfile:', error);
       
-      // Create fallback user data
+      // Even in error case, don't assume profile is completed
       const fallbackUser: User = {
         id: authUser.id,
         name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
         email: authUser.email || '',
         role: (authUser.user_metadata?.role as UserRole) || 'patient',
-        profileCompleted: false,
+        profileCompleted: false, // Keep as false since we couldn't verify
       };
       
       console.log('Using fallback user data after error:', fallbackUser);
@@ -194,7 +192,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         navigateBasedOnProfile(fallbackUser);
       }, 100);
     } finally {
-      console.log('Setting loading to false and initialized to true');
       setIsLoading(false);
       setIsInitialized(true);
     }
@@ -203,7 +200,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     console.log('Starting login process for:', email);
     setIsLoading(true);
-    setHasNavigated(false);
+    setHasNavigated(false); // Reset navigation flag
     
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -226,7 +223,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signup = async (name: string, email: string, password: string, role: UserRole) => {
     console.log('Starting signup process for:', email);
     setIsLoading(true);
-    setHasNavigated(false);
+    setHasNavigated(false); // Reset navigation flag
     
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -248,6 +245,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       console.log('Signup response:', data);
 
+      // Check if user needs email confirmation
       if (data.user && !data.session) {
         console.log('Email confirmation required');
         setIsLoading(false);
@@ -266,7 +264,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     console.log('Logging out user');
     setIsLoading(true);
-    setHasNavigated(false);
+    setHasNavigated(false); // Reset navigation flag
     
     try {
       await supabase.auth.signOut();
@@ -325,7 +323,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
 
   if (!isInitialized) {
-    console.log('Still initializing, showing loading spinner');
     return (
       <AuthContext.Provider value={contextValue}>
         <div className="min-h-screen flex items-center justify-center">
