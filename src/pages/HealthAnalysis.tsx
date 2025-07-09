@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -98,16 +97,24 @@ const HealthAnalysis = () => {
       }
     });
 
-    // Generate realistic sample health metrics
+    // Helper function to get random status with proper typing
+    const getRandomStatus = (): 'normal' | 'high' | 'low' => {
+      const rand = Math.random();
+      if (rand > 0.7) return 'high';
+      if (rand > 0.8) return 'low';
+      return 'normal';
+    };
+
+    // Generate realistic sample health metrics with proper typing
     const sampleMetrics = [
-      { name: 'Total Cholesterol', value: Math.floor(Math.random() * 80) + 150, unit: 'mg/dL', status: Math.random() > 0.7 ? 'high' : 'normal' as const },
-      { name: 'HDL Cholesterol', value: Math.floor(Math.random() * 30) + 40, unit: 'mg/dL', status: Math.random() > 0.8 ? 'low' : 'normal' as const },
-      { name: 'LDL Cholesterol', value: Math.floor(Math.random() * 60) + 70, unit: 'mg/dL', status: Math.random() > 0.7 ? 'high' : 'normal' as const },
-      { name: 'Blood Pressure (Systolic)', value: Math.floor(Math.random() * 40) + 110, unit: 'mmHg', status: Math.random() > 0.6 ? 'high' : 'normal' as const },
+      { name: 'Total Cholesterol', value: Math.floor(Math.random() * 80) + 150, unit: 'mg/dL', status: getRandomStatus() },
+      { name: 'HDL Cholesterol', value: Math.floor(Math.random() * 30) + 40, unit: 'mg/dL', status: getRandomStatus() },
+      { name: 'LDL Cholesterol', value: Math.floor(Math.random() * 60) + 70, unit: 'mg/dL', status: getRandomStatus() },
+      { name: 'Blood Pressure (Systolic)', value: Math.floor(Math.random() * 40) + 110, unit: 'mmHg', status: getRandomStatus() },
       { name: 'Blood Pressure (Diastolic)', value: Math.floor(Math.random() * 20) + 70, unit: 'mmHg', status: 'normal' as const },
-      { name: 'Fasting Glucose', value: Math.floor(Math.random() * 40) + 80, unit: 'mg/dL', status: Math.random() > 0.8 ? 'high' : 'normal' as const },
+      { name: 'Fasting Glucose', value: Math.floor(Math.random() * 40) + 80, unit: 'mg/dL', status: getRandomStatus() },
       { name: 'Heart Rate', value: Math.floor(Math.random() * 30) + 60, unit: 'bpm', status: 'normal' as const },
-      { name: 'BMI', value: Math.floor(Math.random() * 8) + 22, unit: 'kg/m²', status: Math.random() > 0.7 ? 'high' : 'normal' as const },
+      { name: 'BMI', value: Math.floor(Math.random() * 8) + 22, unit: 'kg/m²', status: getRandomStatus() },
     ];
 
     // Generate trend data for the past 6 months
@@ -129,7 +136,7 @@ const HealthAnalysis = () => {
       }))
     );
 
-    const finalData = {
+    const finalData: AnalysisData = {
       originalAnalysis: rawAnalysis,
       fileName: fileName || 'Medical Document',
       description: description || 'Health analysis',
