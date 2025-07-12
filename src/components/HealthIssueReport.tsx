@@ -33,6 +33,97 @@ const HealthIssueReport = ({ onClose }: HealthIssueReportProps) => {
     }
   };
 
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  const callGeminiAPI = async (base64Content: string, retryCount = 0): Promise<string> => {
+    const maxRetries = 3;
+    const baseDelay = 2000; // 2 seconds
+
+    try {
+      console.log(`Calling Gemini API (attempt ${retryCount + 1}/${maxRetries + 1})...`);
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              {
+                text: `Please analyze this medical document and provide a comprehensive analysis based on the patient's description: "${description}". 
+
+Please provide:
+1. Summary of key findings from the document
+2. Detailed health metrics and values (with units)
+3. Potential health concerns or abnormalities
+4. Risk factors identified
+5. Recommendations for follow-up care
+6. Trends or patterns in the data
+7. Important notes or warnings
+
+Structure your response with clear sections and include specific numerical values where available. This analysis will be used to create data visualizations and charts.
+
+Remember to be professional and note that this analysis is for informational purposes only and should not replace professional medical advice.`
+              },
+              {
+                inline_data: {
+                  mime_type: "application/pdf",
+                  data: base64Content
+                }
+              }
+            ]
+          }],
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 2048,
+          }
+        }),
+      });
+
+      console.log('Gemini API response status:', response.status);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error?.message || `HTTP ${response.status}`;
+        
+        // Handle specific error cases with retry logic
+        if (response.status === 503 || errorMessage.includes("overloaded")) {
+          if (retryCount < maxRetries) {
+            const delayTime = baseDelay * Math.pow(2, retryCount); // Exponential backoff
+            console.log(`API overloaded, retrying in ${delayTime}ms...`);
+            toast.warning(`API is busy, retrying in ${delayTime/1000} seconds...`);
+            
+            await delay(delayTime);
+            return callGeminiAPI(base64Content, retryCount + 1);
+          } else {
+            throw new Error("The Gemini API is currently overloaded. Please try again in a few minutes.");
+          }
+        } else if (response.status === 429) {
+          throw new Error("Rate limit exceeded. Please wait a moment before trying again.");
+        } else if (response.status === 401 || response.status === 403) {
+          throw new Error("Invalid API key. Please check your Gemini API key.");
+        } else {
+          throw new Error(errorMessage);
+        }
+      }
+
+      const data = await response.json();
+      console.log('Gemini API response received successfully');
+      
+      const analysisResult = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      
+      if (!analysisResult) {
+        throw new Error('No analysis content received from API');
+      }
+      
+      return analysisResult;
+    } catch (error) {
+      console.error('Gemini API call error:', error);
+      throw error;
+    }
+  };
+
   const handleSubmit = async () => {
     console.log('Starting analysis with:', { description: description.trim(), hasFile: !!file, hasApiKey: !!apiKey.trim() });
     
@@ -57,64 +148,13 @@ const HealthIssueReport = ({ onClose }: HealthIssueReportProps) => {
       // Convert PDF to base64
       const reader = new FileReader();
       reader.onload = async () => {
-        const base64Data = reader.result as string;
-        const base64Content = base64Data.split(',')[1];
-
-        console.log('PDF converted to base64, calling Gemini API...');
-
         try {
-          // Call Gemini API directly from frontend
-          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  {
-                    text: `Please analyze this medical document and provide a comprehensive analysis based on the patient's description: "${description}". 
+          const base64Data = reader.result as string;
+          const base64Content = base64Data.split(',')[1];
 
-Please provide:
-1. Summary of key findings from the document
-2. Detailed health metrics and values (with units)
-3. Potential health concerns or abnormalities
-4. Risk factors identified
-5. Recommendations for follow-up care
-6. Trends or patterns in the data
-7. Important notes or warnings
+          console.log('PDF converted to base64, calling Gemini API...');
 
-Structure your response with clear sections and include specific numerical values where available. This analysis will be used to create data visualizations and charts.
-
-Remember to be professional and note that this analysis is for informational purposes only and should not replace professional medical advice.`
-                  },
-                  {
-                    inline_data: {
-                      mime_type: "application/pdf",
-                      data: base64Content
-                    }
-                  }
-                ]
-              }],
-              generationConfig: {
-                temperature: 0.3,
-                maxOutputTokens: 2048,
-              }
-            }),
-          });
-
-          console.log('Gemini API response status:', response.status);
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Gemini API error:', errorText);
-            throw new Error(`Gemini API error: ${response.status}`);
-          }
-
-          const data = await response.json();
-          console.log('Gemini API response data:', data);
-          
-          const analysisResult = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No analysis available';
+          const analysisResult = await callGeminiAPI(base64Content);
           console.log('Analysis result:', analysisResult);
 
           // Close the modal and navigate to the analysis page
@@ -137,20 +177,22 @@ Remember to be professional and note that this analysis is for informational pur
           toast.success('Document analyzed successfully! Redirecting to detailed analysis...');
         } catch (error) {
           console.error('Analysis error:', error);
-          toast.error('Failed to analyze document. Please check your API key and try again.');
+          const errorMessage = error instanceof Error ? error.message : 'Failed to analyze document. Please try again.';
+          toast.error(errorMessage);
+          setIsAnalyzing(false);
         }
       };
 
       reader.onerror = () => {
         console.error('File reader error');
         toast.error('Failed to read PDF file');
+        setIsAnalyzing(false);
       };
 
       reader.readAsDataURL(file);
     } catch (error) {
       console.error('Error submitting health report:', error);
       toast.error('Failed to submit health report');
-    } finally {
       setIsAnalyzing(false);
     }
   };
