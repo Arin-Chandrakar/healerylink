@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 
@@ -35,6 +35,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [hasNavigated, setHasNavigated] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const navigateBasedOnProfile = useCallback((userData: User) => {
     // Prevent multiple navigations
@@ -42,8 +43,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     console.log('Checking navigation for user:', userData);
     
-    // Only navigate if profile is not completed
-    if (!userData.profileCompleted) {
+    // Don't redirect if user is already on a functional page (not auth pages)
+    const functionalPages = ['/dashboard', '/health-analysis', '/book-appointment', '/messages'];
+    const authPages = ['/sign-in', '/sign-up', '/', '/doctor-profile', '/patient-profile'];
+    
+    // If user is on a functional page, don't redirect them
+    if (functionalPages.includes(location.pathname)) {
+      console.log('User is on a functional page, not redirecting');
+      return;
+    }
+    
+    // Only navigate if profile is not completed AND user is on an auth-related page
+    if (!userData.profileCompleted && authPages.includes(location.pathname)) {
       console.log('Profile not completed, navigating to profile page');
       setHasNavigated(true);
       
@@ -55,9 +66,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         navigate('/patient-profile', { replace: true });
       }
     } else {
-      console.log('Profile completed, staying on current page or going to dashboard');
+      console.log('Profile completed or not on auth page, staying on current page');
     }
-  }, [navigate, hasNavigated]);
+  }, [navigate, hasNavigated, location.pathname]);
 
   useEffect(() => {
     let mounted = true;
@@ -136,7 +147,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .from('profiles')
         .select('*')
         .eq('id', authUser.id)
-        .maybeSingle(); // Use maybeSingle instead of single to handle no results gracefully
+        .maybeSingle();
 
       const { data: profile, error } = await Promise.race([profilePromise, timeoutPromise]) as any;
 
@@ -153,7 +164,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           name: profile.name,
           email: profile.email,
           role: profile.role as UserRole,
-          profileCompleted: true, // If profile exists in DB, it's completed
+          profileCompleted: true,
           imageUrl: profile.image_url,
           location: profile.location,
           specialty: profile.specialty,
@@ -167,7 +178,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
           email: authUser.email || '',
           role: (authUser.user_metadata?.role as UserRole) || 'patient',
-          profileCompleted: false, // This is key - profile is NOT completed
+          profileCompleted: false,
         };
         console.log('Using user data without profile (not completed):', userData);
       }
@@ -182,13 +193,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error('Error in fetchUserProfile:', error);
       
-      // Even in error case, don't assume profile is completed
       const fallbackUser: User = {
         id: authUser.id,
         name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
         email: authUser.email || '',
         role: (authUser.user_metadata?.role as UserRole) || 'patient',
-        profileCompleted: false, // Keep as false since we couldn't verify
+        profileCompleted: false,
       };
       
       console.log('Using fallback user data after error:', fallbackUser);
@@ -207,7 +217,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     console.log('Starting login process for:', email);
     setIsLoading(true);
-    setHasNavigated(false); // Reset navigation flag
+    setHasNavigated(false);
     
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -230,7 +240,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signup = async (name: string, email: string, password: string, role: UserRole) => {
     console.log('Starting signup process for:', email);
     setIsLoading(true);
-    setHasNavigated(false); // Reset navigation flag
+    setHasNavigated(false);
     
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -252,7 +262,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       console.log('Signup response:', data);
 
-      // Check if user needs email confirmation
       if (data.user && !data.session) {
         console.log('Email confirmation required');
         setIsLoading(false);
@@ -271,7 +280,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     console.log('Logging out user');
     setIsLoading(true);
-    setHasNavigated(false); // Reset navigation flag
+    setHasNavigated(false);
     
     try {
       await supabase.auth.signOut();
@@ -326,7 +335,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isInitialized,
     userEmail: user?.email,
     profileCompleted: user?.profileCompleted,
-    hasNavigated
+    hasNavigated,
+    currentPath: location.pathname
   });
 
   if (!isInitialized) {
