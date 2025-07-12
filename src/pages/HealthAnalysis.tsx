@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -49,6 +48,12 @@ const HealthAnalysis = () => {
     }
   }, [location.state, navigate]);
 
+  const getRandomStatus = (): 'normal' | 'high' | 'low' => {
+    const statuses: ('normal' | 'high' | 'low')[] = ['normal', 'high', 'low'];
+    const randomIndex = Math.floor(Math.random() * statuses.length);
+    return statuses[randomIndex];
+  };
+
   const processAnalysisData = (rawAnalysis: string, fileName: string, description: string): AnalysisData => {
     console.log('Processing raw analysis:', rawAnalysis);
     
@@ -98,16 +103,16 @@ const HealthAnalysis = () => {
       }
     });
 
-    // Generate realistic sample health metrics
-    const sampleMetrics = [
-      { name: 'Total Cholesterol', value: Math.floor(Math.random() * 80) + 150, unit: 'mg/dL', status: Math.random() > 0.7 ? 'high' : 'normal' as const },
-      { name: 'HDL Cholesterol', value: Math.floor(Math.random() * 30) + 40, unit: 'mg/dL', status: Math.random() > 0.8 ? 'low' : 'normal' as const },
-      { name: 'LDL Cholesterol', value: Math.floor(Math.random() * 60) + 70, unit: 'mg/dL', status: Math.random() > 0.7 ? 'high' : 'normal' as const },
-      { name: 'Blood Pressure (Systolic)', value: Math.floor(Math.random() * 40) + 110, unit: 'mmHg', status: Math.random() > 0.6 ? 'high' : 'normal' as const },
-      { name: 'Blood Pressure (Diastolic)', value: Math.floor(Math.random() * 20) + 70, unit: 'mmHg', status: 'normal' as const },
-      { name: 'Fasting Glucose', value: Math.floor(Math.random() * 40) + 80, unit: 'mg/dL', status: Math.random() > 0.8 ? 'high' : 'normal' as const },
-      { name: 'Heart Rate', value: Math.floor(Math.random() * 30) + 60, unit: 'bpm', status: 'normal' as const },
-      { name: 'BMI', value: Math.floor(Math.random() * 8) + 22, unit: 'kg/m²', status: Math.random() > 0.7 ? 'high' : 'normal' as const },
+    // Generate realistic sample health metrics with proper typing
+    const sampleMetrics: Array<{ name: string; value: number; unit: string; status: 'normal' | 'high' | 'low' }> = [
+      { name: 'Total Cholesterol', value: Math.floor(Math.random() * 80) + 150, unit: 'mg/dL', status: Math.random() > 0.7 ? 'high' : 'normal' },
+      { name: 'HDL Cholesterol', value: Math.floor(Math.random() * 30) + 40, unit: 'mg/dL', status: Math.random() > 0.8 ? 'low' : 'normal' },
+      { name: 'LDL Cholesterol', value: Math.floor(Math.random() * 60) + 70, unit: 'mg/dL', status: Math.random() > 0.7 ? 'high' : 'normal' },
+      { name: 'Blood Pressure (Systolic)', value: Math.floor(Math.random() * 40) + 110, unit: 'mmHg', status: Math.random() > 0.6 ? 'high' : 'normal' },
+      { name: 'Blood Pressure (Diastolic)', value: Math.floor(Math.random() * 20) + 70, unit: 'mmHg', status: 'normal' },
+      { name: 'Fasting Glucose', value: Math.floor(Math.random() * 40) + 80, unit: 'mg/dL', status: Math.random() > 0.8 ? 'high' : 'normal' },
+      { name: 'Heart Rate', value: Math.floor(Math.random() * 30) + 60, unit: 'bpm', status: 'normal' },
+      { name: 'BMI', value: Math.floor(Math.random() * 8) + 22, unit: 'kg/m²', status: Math.random() > 0.7 ? 'high' : 'normal' },
     ];
 
     // Generate trend data for the past 6 months
@@ -129,7 +134,7 @@ const HealthAnalysis = () => {
       }))
     );
 
-    const finalData = {
+    const finalData: AnalysisData = {
       originalAnalysis: rawAnalysis,
       fileName: fileName || 'Medical Document',
       description: description || 'Health analysis',
