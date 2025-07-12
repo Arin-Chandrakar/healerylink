@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -128,15 +127,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log('Fetching profile for user:', authUser.id);
       
-      const { data: profile, error } = await supabase
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
+      );
+      
+      const profilePromise = supabase
         .from('profiles')
         .select('*')
         .eq('id', authUser.id)
-        .single();
+        .maybeSingle(); // Use maybeSingle instead of single to handle no results gracefully
 
-      if (error && error.code !== 'PGRST116') {
+      const { data: profile, error } = await Promise.race([profilePromise, timeoutPromise]) as any;
+
+      if (error) {
         console.error('Error fetching profile:', error);
-        throw error;
+        // Don't throw - handle gracefully
       }
 
       let userData: User;
@@ -192,6 +198,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         navigateBasedOnProfile(fallbackUser);
       }, 100);
     } finally {
+      console.log('Profile fetch completed, setting loading to false');
       setIsLoading(false);
       setIsInitialized(true);
     }
