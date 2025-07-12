@@ -155,24 +155,29 @@ Remember to be professional and note that this analysis is for informational pur
           console.log('PDF converted to base64, calling Gemini API...');
 
           const analysisResult = await callGeminiAPI(base64Content);
-          console.log('Analysis result:', analysisResult);
+          console.log('Analysis result received, navigating to health analysis...');
 
-          // Close the modal and navigate to the analysis page
-          onClose();
-          
-          console.log('Navigating to health analysis with:', {
+          // Store the analysis data in sessionStorage to prevent auth redirects from interfering
+          sessionStorage.setItem('healthAnalysisData', JSON.stringify({
             analysisData: analysisResult,
             fileName: file.name,
             description: description
-          });
+          }));
+
+          // Close the modal first
+          onClose();
           
-          navigate('/health-analysis', {
-            state: {
-              analysisData: analysisResult,
-              fileName: file.name,
-              description: description
-            }
-          });
+          // Small delay to ensure modal closes before navigation
+          setTimeout(() => {
+            console.log('Navigating to health analysis page');
+            navigate('/health-analysis', {
+              state: {
+                analysisData: analysisResult,
+                fileName: file.name,
+                description: description
+              }
+            });
+          }, 100);
 
           toast.success('Document analyzed successfully! Redirecting to detailed analysis...');
         } catch (error) {

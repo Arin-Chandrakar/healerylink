@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,30 +34,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [hasNavigated, setHasNavigated] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
-  const navigateBasedOnProfile = useCallback((userData: User) => {
-    // Prevent multiple navigations
-    if (hasNavigated) return;
+  const navigateBasedOnProfile = useCallback((userData: User, isNewSignup = false) => {
+    console.log('Checking navigation for user:', userData, 'isNewSignup:', isNewSignup);
     
-    console.log('Checking navigation for user:', userData);
-    
-    // Don't redirect if user is already on a functional page (not auth pages)
+    // Define pages where we should NOT redirect users
     const functionalPages = ['/dashboard', '/health-analysis', '/book-appointment', '/messages'];
-    const authPages = ['/sign-in', '/sign-up', '/', '/doctor-profile', '/patient-profile'];
+    const profilePages = ['/doctor-profile', '/patient-profile'];
     
-    // If user is on a functional page, don't redirect them
-    if (functionalPages.includes(location.pathname)) {
-      console.log('User is on a functional page, not redirecting');
+    // If user is on a functional page and profile is completed, don't redirect
+    if (functionalPages.includes(location.pathname) && userData.profileCompleted) {
+      console.log('User is on a functional page with completed profile, not redirecting');
       return;
     }
     
-    // Only navigate if profile is not completed AND user is on an auth-related page
-    if (!userData.profileCompleted && authPages.includes(location.pathname)) {
-      console.log('Profile not completed, navigating to profile page');
-      setHasNavigated(true);
+    // If user is on a profile page, don't redirect (they're already completing it)
+    if (profilePages.includes(location.pathname)) {
+      console.log('User is on a profile page, not redirecting');
+      return;
+    }
+    
+    // Only redirect to profile completion if:
+    // 1. Profile is not completed AND
+    // 2. It's a new signup OR user is on auth pages
+    const authPages = ['/sign-in', '/sign-up', '/'];
+    const shouldRedirectToProfile = !userData.profileCompleted && 
+      (isNewSignup || authPages.includes(location.pathname));
+    
+    if (shouldRedirectToProfile) {
+      console.log('Redirecting to profile completion');
       
       if (userData.role === 'doctor') {
         console.log('Redirecting to doctor profile');
@@ -65,10 +73,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log('Redirecting to patient profile');  
         navigate('/patient-profile', { replace: true });
       }
-    } else {
-      console.log('Profile completed or not on auth page, staying on current page');
+    } else if (userData.profileCompleted && authPages.includes(location.pathname)) {
+      // If profile is completed and user is on auth pages, redirect to dashboard
+      console.log('Profile completed, redirecting to dashboard');
+      navigate('/dashboard', { replace: true });
     }
-  }, [navigate, hasNavigated, location.pathname]);
+  }, [navigate, location.pathname]);
 
   useEffect(() => {
     let mounted = true;
@@ -83,13 +93,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (session?.user) {
         console.log('User session found, fetching profile...');
-        await fetchUserProfile(session.user);
+        const isNewSignup = event === 'SIGNED_UP';
+        await fetchUserProfile(session.user, isNewSignup);
       } else {
         console.log('No session, clearing user state');
         setUser(null);
         setIsLoading(false);
         setIsInitialized(true);
-        setHasNavigated(false);
       }
     });
 
@@ -112,7 +122,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log('Initial session check:', session?.user?.email || 'No session');
         
         if (session?.user && mounted) {
-          await fetchUserProfile(session.user);
+          await fetchUserProfile(session.user, false);
         } else if (mounted) {
           setIsLoading(false);
           setIsInitialized(true);
@@ -134,9 +144,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  const fetchUserProfile = async (authUser: SupabaseUser) => {
+  const fetchUserProfile = async (authUser: SupabaseUser, isNewSignup = false) => {
     try {
-      console.log('Fetching profile for user:', authUser.id);
+      console.log('Fetching profile for user:', authUser.id, 'isNewSignup:', isNewSignup);
       
       // Add timeout to prevent hanging
       const timeoutPromise = new Promise((_, reject) => 
@@ -187,7 +197,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       // Navigate based on profile completion status
       setTimeout(() => {
-        navigateBasedOnProfile(userData);
+        navigateBasedOnProfile(userData, isNewSignup);
       }, 100);
       
     } catch (error) {
@@ -205,7 +215,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(fallbackUser);
       
       setTimeout(() => {
-        navigateBasedOnProfile(fallbackUser);
+        navigateBasedOnProfile(fallbackUser, isNewSignup);
       }, 100);
     } finally {
       console.log('Profile fetch completed, setting loading to false');
@@ -217,7 +227,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     console.log('Starting login process for:', email);
     setIsLoading(true);
-    setHasNavigated(false);
     
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -240,7 +249,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signup = async (name: string, email: string, password: string, role: UserRole) => {
     console.log('Starting signup process for:', email);
     setIsLoading(true);
-    setHasNavigated(false);
     
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -280,7 +288,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     console.log('Logging out user');
     setIsLoading(true);
-    setHasNavigated(false);
     
     try {
       await supabase.auth.signOut();
@@ -335,7 +342,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isInitialized,
     userEmail: user?.email,
     profileCompleted: user?.profileCompleted,
-    hasNavigated,
     currentPath: location.pathname
   });
 
